@@ -1,23 +1,24 @@
-import { Ship, LayoutDashboard, Package, ClipboardCheck, Wallet, User } from 'lucide-react';
+import { Ship, LayoutDashboard, Package, ClipboardCheck, Wallet, User, Clock } from 'lucide-react';
 import { Button } from './ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { useAuth } from '../context/AuthContext';
 
 interface SidebarProps {
   currentView: string;
   setCurrentView: (view: string) => void;
-  userRole: string;
-  setUserRole: (role: 'owner' | 'manager' | 'finance' | 'foreman' | 'worker') => void;
 }
 
-export function Sidebar({ currentView, setCurrentView, userRole, setUserRole }: SidebarProps) {
+export function Sidebar({ currentView, setCurrentView }: SidebarProps) {
+  const { user, logout } = useAuth();
+  const userRole = user?.role ?? 'worker';
+
   const allMenuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['owner', 'manager', 'finance', 'foreman', 'worker'] },
     { id: 'inventory', label: 'Inventory', icon: Package, roles: ['owner', 'manager', 'finance', 'foreman'] },
     { id: 'production', label: 'Production & QC', icon: ClipboardCheck, roles: ['owner', 'manager', 'foreman', 'worker'] },
-    { id: 'payroll', label: 'Payroll', icon: Wallet, roles: ['owner', 'manager', 'finance', 'foreman', 'worker'] },
+    { id: 'dtr', label: 'DTR & Attendance', icon: Clock, roles: ['owner', 'manager', 'finance', 'foreman', 'worker'] },
+    { id: 'payroll', label: 'Payroll & Payslips', icon: Wallet, roles: ['owner', 'manager', 'finance', 'foreman', 'worker'] },
   ];
 
-  // Filter menu items based on user role
   const menuItems = allMenuItems.filter(item => item.roles.includes(userRole));
 
   return (
@@ -29,22 +30,6 @@ export function Sidebar({ currentView, setCurrentView, userRole, setUserRole }: 
             <div>Seabridge Boats</div>
             <div className="text-blue-300 text-sm">Manufacturing</div>
           </div>
-        </div>
-        
-        <div className="space-y-2">
-          <label className="text-xs text-blue-300">User Role</label>
-          <Select value={userRole} onValueChange={setUserRole}>
-            <SelectTrigger className="bg-blue-800 border-blue-700">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="owner">Owner</SelectItem>
-              <SelectItem value="manager">Manager</SelectItem>
-              <SelectItem value="finance">Finance</SelectItem>
-              <SelectItem value="foreman">Foreman QC</SelectItem>
-              <SelectItem value="worker">Skilled Worker</SelectItem>
-            </SelectContent>
-          </Select>
         </div>
       </div>
 
@@ -74,15 +59,27 @@ export function Sidebar({ currentView, setCurrentView, userRole, setUserRole }: 
       </nav>
 
       <div className="p-4 border-t border-blue-800">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-blue-700 rounded-full flex items-center justify-center">
-            <User className="w-4 h-4" />
+        {user && (
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-blue-700 rounded-full flex items-center justify-center">
+                <User className="w-4 h-4" />
+              </div>
+              <div className="text-sm">
+                <div className="capitalize">{user.role}</div>
+                <div className="text-blue-300 text-xs">{user.name}</div>
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs text-blue-200 hover:text-white hover:bg-blue-800"
+              onClick={logout}
+            >
+              Logout
+            </Button>
           </div>
-          <div className="text-sm">
-            <div className="capitalize">{userRole}</div>
-            <div className="text-blue-300 text-xs">Alexander Cabahug Jr</div>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );

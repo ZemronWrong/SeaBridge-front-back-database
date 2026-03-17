@@ -1,13 +1,12 @@
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { Package, Users, ClipboardCheck, DollarSign, AlertTriangle, TrendingUp } from 'lucide-react';
+import { Package, Users, ClipboardCheck, DollarSign, AlertTriangle, TrendingUp, Clock } from 'lucide-react';
 import { Progress } from './ui/progress';
 import { Badge } from './ui/badge';
+import { useAuth } from '../context/AuthContext';
 
-interface DashboardProps {
-  userRole: string;
-}
-
-export function Dashboard({ userRole }: DashboardProps) {
+export function Dashboard() {
+  const { user } = useAuth();
+  const userRole = user?.role ?? 'worker';
   const stats = [
     { 
       title: 'Total Materials', 
@@ -63,8 +62,13 @@ export function Dashboard({ userRole }: DashboardProps) {
   return (
     <div className="space-y-8">
       <div>
-        <h1>Welcome, {userRole.charAt(0).toUpperCase() + userRole.slice(1)}</h1>
-        <p className="text-gray-600">Seabridge Boats Manufacturing - Operations Dashboard</p>
+        <h1>Welcome, {user?.name ?? 'User'}</h1>
+        <p className="text-gray-600">
+          {userRole === 'owner' && 'Executive overview of production, DTR, and payroll.'}
+          {userRole === 'manager' && 'Team-level view of attendance, overtime, and project progress.'}
+          {userRole === 'finance' && 'Payroll and payslip analytics across all employees.'}
+          {['foreman', 'worker'].includes(userRole) && 'Personal and team insights for daily operations.'}
+        </p>
       </div>
 
       {/* Stats Grid */}
@@ -184,9 +188,44 @@ export function Dashboard({ userRole }: DashboardProps) {
                 <div className="text-xs text-gray-600">Log quality check results</div>
               </button>
               <button className="w-full p-3 text-left border rounded-lg hover:bg-gray-50 transition-colors">
-                <div className="text-sm">Generate Payroll</div>
-                <div className="text-xs text-gray-600">Create payroll for current period</div>
+                <div className="text-sm">Open DTR & Attendance</div>
+                <div className="text-xs text-gray-600">Review daily time records and overtime</div>
               </button>
+              <button className="w-full p-3 text-left border rounded-lg hover:bg-gray-50 transition-colors">
+                <div className="text-sm">Generate Payroll</div>
+                <div className="text-xs text-gray-600">Create payroll and payslips for current period</div>
+              </button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+      {/* Simple DTR summary for defense explanation */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="w-5 h-5 text-indigo-600" />
+              Attendance Snapshot
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <p className="text-gray-500">Present Today</p>
+                <p className="text-2xl font-semibold">21</p>
+              </div>
+              <div>
+                <p className="text-gray-500">On Overtime</p>
+                <p className="text-2xl font-semibold">4</p>
+              </div>
+              <div>
+                <p className="text-gray-500">On Leave</p>
+                <p className="text-2xl font-semibold">2</p>
+              </div>
+              <div>
+                <p className="text-gray-500">Absent</p>
+                <p className="text-2xl font-semibold">1</p>
+              </div>
             </div>
           </CardContent>
         </Card>
