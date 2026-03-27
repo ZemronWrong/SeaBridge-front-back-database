@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -8,33 +8,38 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Badge } from './ui/badge';
 import { Plus, DollarSign, Calendar, FileText, Download } from 'lucide-react';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
+import { apiFetch } from '../api';
 
 interface PayrollModuleProps {}
 
 interface Employee {
-  id: string;
+  id: number;
+  employee_id: string;
+  first_name?: string;
+  last_name?: string;
   name: string;
   position: string;
-  dailyRate: number;
-  type: 'Regular' | 'Contractual';
-  teamId: string;
+  daily_rate: string | number;
+  employment_type: 'Regular' | 'Contractual';
+  team_id: string;
 }
 
 interface PayrollRecord {
-  id: string;
-  employeeId: string;
-  employeeName: string;
+  id: number;
+  payroll_id: string;
+  employee: number;
+  employee_name: string;
   position: string;
   period: string;
-  daysWorked: number;
-  dailyRate: number;
-  grossPay: number;
-  deductions: number;
-  netPay: number;
+  days_worked: number;
+  daily_rate: string | number;
+  gross_pay: string | number;
+  deductions: string | number;
+  net_pay: string | number;
   status: 'Pending' | 'Processed' | 'Paid';
-  createdDate: string;
+  created_date: string;
 }
 
 export function PayrollModule({}: PayrollModuleProps) {
@@ -43,58 +48,66 @@ export function PayrollModule({}: PayrollModuleProps) {
   const [isPayrollDialogOpen, setIsPayrollDialogOpen] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState('all');
 
-  const [employees] = useState<Employee[]>([
-    { id: 'EMP-001', name: 'Juan dela Cruz', position: 'Senior Welder', dailyRate: 850, type: 'Regular', teamId: 'TEAM-A' },
-    { id: 'EMP-002', name: 'Pedro Santos', position: 'Engine Technician', dailyRate: 900, type: 'Regular', teamId: 'TEAM-A' },
-    { id: 'EMP-003', name: 'Maria Garcia', position: 'Carpenter', dailyRate: 750, type: 'Regular', teamId: 'TEAM-A' },
-    { id: 'EMP-004', name: 'Jose Reyes', position: 'Interior Specialist', dailyRate: 800, type: 'Contractual', teamId: 'TEAM-A' },
-    { id: 'EMP-005', name: 'Roberto Cruz', position: 'Painter', dailyRate: 700, type: 'Regular', teamId: 'TEAM-B' },
-    { id: 'EMP-006', name: 'Ana Lopez', position: 'Electrician', dailyRate: 820, type: 'Regular', teamId: 'TEAM-B' },
-    { id: 'EMP-007', name: 'Carlos Mendoza', position: 'Fiberglass Worker', dailyRate: 780, type: 'Contractual', teamId: 'TEAM-B' },
-  ]);
-
-  const [payrollRecords, setPayrollRecords] = useState<PayrollRecord[]>([
-    { id: 'PAY-001', employeeId: 'EMP-001', employeeName: 'Juan dela Cruz', position: 'Senior Welder', period: '2025-10', daysWorked: 22, dailyRate: 850, grossPay: 18700, deductions: 1870, netPay: 16830, status: 'Paid', createdDate: '2025-10-31' },
-    { id: 'PAY-002', employeeId: 'EMP-002', employeeName: 'Pedro Santos', position: 'Engine Technician', period: '2025-10', daysWorked: 22, dailyRate: 900, grossPay: 19800, deductions: 1980, netPay: 17820, status: 'Paid', createdDate: '2025-10-31' },
-    { id: 'PAY-003', employeeId: 'EMP-003', employeeName: 'Maria Garcia', position: 'Carpenter', period: '2025-10', daysWorked: 20, dailyRate: 750, grossPay: 15000, deductions: 1500, netPay: 13500, status: 'Paid', createdDate: '2025-10-31' },
-    { id: 'PAY-004', employeeId: 'EMP-001', employeeName: 'Juan dela Cruz', position: 'Senior Welder', period: '2025-11', daysWorked: 9, dailyRate: 850, grossPay: 7650, deductions: 765, netPay: 6885, status: 'Pending', createdDate: '2025-11-09' },
-    { id: 'PAY-005', employeeId: 'EMP-002', employeeName: 'Pedro Santos', position: 'Engine Technician', period: '2025-11', daysWorked: 9, dailyRate: 900, grossPay: 8100, deductions: 810, netPay: 7290, status: 'Pending', createdDate: '2025-11-09' },
-  ]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [payrollRecords, setPayrollRecords] = useState<PayrollRecord[]>([]);
 
   const [newPayroll, setNewPayroll] = useState({
     employeeId: '',
     period: '',
-    daysWorked: 0
+    days_worked: 0
   });
 
-  const handleCreatePayroll = () => {
-    const employee = employees.find(e => e.id === newPayroll.employeeId);
-    if (!employee) return;
+  useEffect(() => {
+    fetchData();
+  }, [userRole]);
 
-    const grossPay = newPayroll.daysWorked * employee.dailyRate;
-    const deductions = grossPay * 0.10; // 10% deduction example
-    const netPay = grossPay - deductions;
+  const fetchData = async () => {
+    try {
+      const pData = await apiFetch('/payroll/');
+      setPayrollRecords(pData);
+      
+      if (['owner', 'manager', 'finance'].includes(userRole)) {
+        const eData = await apiFetch('/employees/');
+        setEmployees(eData);
+      }
+    } catch(e: any) {
+      toast.error('Failed to load payroll data: ' + e.message);
+    }
+  };
 
-    const newId = `PAY-${String(payrollRecords.length + 1).padStart(3, '0')}`;
-    const record: PayrollRecord = {
-      id: newId,
-      employeeId: employee.id,
-      employeeName: employee.name,
-      position: employee.position,
-      period: newPayroll.period,
-      daysWorked: newPayroll.daysWorked,
-      dailyRate: employee.dailyRate,
-      grossPay,
-      deductions,
-      netPay,
-      status: 'Pending',
-      createdDate: new Date().toISOString().split('T')[0]
-    };
+  const handleCreatePayroll = async () => {
+    if (!newPayroll.employeeId) {
+      toast.error('Please select an employee.');
+      return;
+    }
+    if (!newPayroll.period) {
+      toast.error('Please enter a pay period.');
+      return;
+    }
+    if (newPayroll.days_worked <= 0) {
+      toast.error('Days worked must be greater than 0.');
+      return;
+    }
 
-    setPayrollRecords([...payrollRecords, record]);
-    setIsPayrollDialogOpen(false);
-    setNewPayroll({ employeeId: '', period: '', daysWorked: 0 });
-    toast.success('Payroll record created');
+    try {
+      const payload = {
+        employee_id: newPayroll.employeeId,
+        period: newPayroll.period,
+        days_worked: newPayroll.days_worked
+      };
+      
+      const savedRecord = await apiFetch('/payroll/', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+      
+      setPayrollRecords([...payrollRecords, savedRecord]);
+      setIsPayrollDialogOpen(false);
+      setNewPayroll({ employeeId: '', period: '', days_worked: 0 });
+      toast.success('Payroll record created');
+    } catch (e: any) {
+      toast.error('Failed to create payroll: ' + e.message);
+    }
   };
 
   // Role-based permissions
@@ -102,33 +115,42 @@ export function PayrollModule({}: PayrollModuleProps) {
   const isViewOnly = userRole === 'manager';
   const isEmployeeView = ['foreman', 'worker'].includes(userRole);
   
-  const currentEmployeeId = isEmployeeView ? user?.employeeId ?? null : null;
-  const currentTeamId = user?.teamId;
-  const currentEmployee = isEmployeeView && currentEmployeeId ? employees.find(e => e.id === currentEmployeeId) : null;
+  const currentEmployeeId = isEmployeeView ? (user as any)?.employee_id ?? null : null;
+  const currentTeamId = (user as any)?.team_id;
+  
+  // Try to derive employee details from payroll records if the user is a worker
+  let currentEmployee: Employee | null | undefined = null;
+  if (isEmployeeView && currentEmployeeId) {
+    currentEmployee = employees.find((e: Employee) => e.employee_id === currentEmployeeId);
+    if (!currentEmployee && payrollRecords.length > 0) {
+      const r = payrollRecords[0];
+      currentEmployee = {
+        id: r.employee,
+        employee_id: currentEmployeeId,
+        name: r.employee_name,
+        position: r.position,
+        daily_rate: r.daily_rate,
+        employment_type: 'Regular', // placeholder
+        team_id: currentTeamId
+      };
+    }
+  }
 
-  const roleFilteredRecords = payrollRecords.filter((r) => {
-    if (userRole === 'owner' || userRole === 'finance') return true;
-    if (userRole === 'manager') {
-      if (!currentTeamId) return false;
-      const employee = employees.find((e) => e.id === r.employeeId);
-      return employee?.teamId === currentTeamId;
-    }
-    if (isEmployeeView && currentEmployeeId) {
-      return r.employeeId === currentEmployeeId;
-    }
-    return false;
-  });
+  // API filters automatically for employees based on backend role logic, but frontend might still apply filters based on state 
+  // Let's rely primarily on backend filtering for security, the API only returns what is allowed.
+  
+  const roleFilteredRecords = Array.isArray(payrollRecords) ? payrollRecords : [];
 
   const filteredRecords = selectedPeriod === 'all' 
     ? roleFilteredRecords 
-    : roleFilteredRecords.filter(r => r.period === selectedPeriod);
+    : roleFilteredRecords.filter((r: PayrollRecord) => r.period === selectedPeriod);
 
-  const periods = ['all', ...Array.from(new Set(roleFilteredRecords.map(r => r.period)))];
+  const periods = ['all', ...Array.from(new Set(roleFilteredRecords.map((r: PayrollRecord) => r.period)))];
   
-  const totalGrossPay = filteredRecords.reduce((sum, r) => sum + r.grossPay, 0);
-  const totalDeductions = filteredRecords.reduce((sum, r) => sum + r.deductions, 0);
-  const totalNetPay = filteredRecords.reduce((sum, r) => sum + r.netPay, 0);
-  const pendingPayments = payrollRecords.filter(r => r.status === 'Pending').length;
+  const totalGrossPay = filteredRecords.reduce((sum: number, r: PayrollRecord) => sum + Number(r.gross_pay || 0), 0);
+  const totalDeductions = filteredRecords.reduce((sum: number, r: PayrollRecord) => sum + Number(r.deductions || 0), 0);
+  const totalNetPay = filteredRecords.reduce((sum: number, r: PayrollRecord) => sum + Number(r.net_pay || 0), 0);
+  const pendingPayments = roleFilteredRecords.filter((r: PayrollRecord) => r.status === 'Pending').length;
 
   const [selectedPayslip, setSelectedPayslip] = useState<PayrollRecord | null>(null);
   const [isPayslipOpen, setIsPayslipOpen] = useState(false);
@@ -152,17 +174,17 @@ export function PayrollModule({}: PayrollModuleProps) {
       'Net Pay',
       'Status',
     ];
-    const rows = filteredRecords.map((r) => [
-      r.id,
-      r.employeeId,
-      r.employeeName,
+    const rows = filteredRecords.map((r: PayrollRecord) => [
+      r.payroll_id,
+      String(r.employee),
+      r.employee_name,
       r.position,
       r.period,
-      String(r.daysWorked),
-      String(r.dailyRate),
-      String(r.grossPay),
+      String(r.days_worked),
+      String(r.daily_rate),
+      String(r.gross_pay),
       String(r.deductions),
-      String(r.netPay),
+      String(r.net_pay),
       r.status,
     ]);
     const csvContent = [header, ...rows].map((row) => row.join(',')).join('\n');
@@ -178,16 +200,17 @@ export function PayrollModule({}: PayrollModuleProps) {
   };
 
   const printPayslip = (record: PayrollRecord) => {
-    const allowances = record.grossPay * 0.05;
-    const totalDeductions = record.deductions;
-    const netPay = record.netPay;
+    const gross = Number(record.gross_pay);
+    const allowances = gross * 0.05;
+    const totalDeductions = Number(record.deductions);
+    const netPay = Number(record.net_pay);
 
     const win = window.open('', '_blank', 'width=800,height=600');
     if (!win) return;
     win.document.write(`
       <html>
         <head>
-          <title>Payslip - ${record.employeeName}</title>
+          <title>Payslip - ${record.employee_name}</title>
           <style>
             body { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 24px; }
             h1 { font-size: 20px; margin-bottom: 4px; }
@@ -202,15 +225,15 @@ export function PayrollModule({}: PayrollModuleProps) {
           <p>Official Payslip</p>
           <h2>Employee Information</h2>
           <table>
-            <tr><th>Employee</th><td>${record.employeeName}</td></tr>
+            <tr><th>Employee</th><td>${record.employee_name}</td></tr>
             <tr><th>Position</th><td>${record.position}</td></tr>
             <tr><th>Period</th><td>${record.period}</td></tr>
-            <tr><th>Payroll ID</th><td>${record.id}</td></tr>
+            <tr><th>Payroll ID</th><td>${record.payroll_id}</td></tr>
           </table>
           <h2>Earnings</h2>
           <table>
             <tr><th>Description</th><th>Amount (PHP)</th></tr>
-            <tr><td>Basic Pay (${record.daysWorked} days x ₱${record.dailyRate.toLocaleString()})</td><td>₱${record.grossPay.toLocaleString()}</td></tr>
+            <tr><td>Basic Pay (${record.days_worked} days x ₱${Number(record.daily_rate).toLocaleString()})</td><td>₱${gross.toLocaleString()}</td></tr>
             <tr><td>Allowances (5%)</td><td>₱${allowances.toLocaleString()}</td></tr>
           </table>
           <h2>Deductions</h2>
@@ -260,15 +283,15 @@ export function PayrollModule({}: PayrollModuleProps) {
                   <Label>Employee</Label>
                   <Select 
                     value={newPayroll.employeeId}
-                    onValueChange={(v) => setNewPayroll({...newPayroll, employeeId: v})}
+                    onValueChange={(v: string) => setNewPayroll({...newPayroll, employeeId: v})}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select employee" />
                     </SelectTrigger>
                     <SelectContent>
                       {employees.map(emp => (
-                        <SelectItem key={emp.id} value={emp.id}>
-                          {emp.name} - {emp.position} (₱{emp.dailyRate}/day)
+                        <SelectItem key={emp.id} value={emp.employee_id}>
+                          {emp.name} - {emp.position} (₱{emp.daily_rate}/day)
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -286,28 +309,28 @@ export function PayrollModule({}: PayrollModuleProps) {
                   <Label>Days Worked</Label>
                   <Input 
                     type="number"
-                    value={newPayroll.daysWorked}
-                    onChange={(e) => setNewPayroll({...newPayroll, daysWorked: Number(e.target.value)})}
+                    value={newPayroll.days_worked}
+                    onChange={(e) => setNewPayroll({...newPayroll, days_worked: Number(e.target.value)})}
                     placeholder="Number of days worked"
                   />
                 </div>
-                {newPayroll.employeeId && newPayroll.daysWorked > 0 && (
+                {newPayroll.employeeId && newPayroll.days_worked > 0 && (
                   <div className="p-4 bg-blue-50 rounded-lg space-y-2">
                     <div className="flex justify-between">
                       <span>Daily Rate:</span>
-                      <span>₱{employees.find(e => e.id === newPayroll.employeeId)?.dailyRate.toLocaleString()}</span>
+                      <span>₱{Number(employees.find(e => e.employee_id === newPayroll.employeeId)?.daily_rate || 0).toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Gross Pay:</span>
-                      <span>₱{((employees.find(e => e.id === newPayroll.employeeId)?.dailyRate || 0) * newPayroll.daysWorked).toLocaleString()}</span>
+                      <span>₱{(Number(employees.find(e => e.employee_id === newPayroll.employeeId)?.daily_rate || 0) * newPayroll.days_worked).toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Deductions (10%):</span>
-                      <span>₱{(((employees.find(e => e.id === newPayroll.employeeId)?.dailyRate || 0) * newPayroll.daysWorked) * 0.10).toLocaleString()}</span>
+                      <span>₱{((Number(employees.find(e => e.employee_id === newPayroll.employeeId)?.daily_rate || 0) * newPayroll.days_worked) * 0.10).toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between pt-2 border-t">
                       <span>Net Pay:</span>
-                      <span>₱{(((employees.find(e => e.id === newPayroll.employeeId)?.dailyRate || 0) * newPayroll.daysWorked) * 0.90).toLocaleString()}</span>
+                      <span>₱{((Number(employees.find(e => e.employee_id === newPayroll.employeeId)?.daily_rate || 0) * newPayroll.days_worked) * 0.90).toLocaleString()}</span>
                     </div>
                   </div>
                 )}
@@ -339,11 +362,11 @@ export function PayrollModule({}: PayrollModuleProps) {
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Daily Rate</p>
-                    <p>₱{currentEmployee.dailyRate.toLocaleString()}</p>
+                    <p>₱{Number(currentEmployee.daily_rate).toLocaleString()}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Type</p>
-                    <p>{currentEmployee.type}</p>
+                    <p>{currentEmployee.employment_type}</p>
                   </div>
                 </div>
               </div>
@@ -435,13 +458,13 @@ export function PayrollModule({}: PayrollModuleProps) {
               <TableBody>
                 {employees.map((employee) => (
                   <TableRow key={employee.id}>
-                    <TableCell>{employee.id}</TableCell>
+                    <TableCell>{employee.employee_id}</TableCell>
                     <TableCell>{employee.name}</TableCell>
                     <TableCell>{employee.position}</TableCell>
-                    <TableCell>₱{employee.dailyRate.toLocaleString()}</TableCell>
+                    <TableCell>₱{Number(employee.daily_rate).toLocaleString()}</TableCell>
                     <TableCell>
-                      <Badge variant={employee.type === 'Regular' ? 'default' : 'secondary'}>
-                        {employee.type}
+                      <Badge variant={employee.employment_type === 'Regular' ? 'default' : 'secondary'}>
+                        {employee.employment_type}
                       </Badge>
                     </TableCell>
                   </TableRow>
@@ -491,14 +514,14 @@ export function PayrollModule({}: PayrollModuleProps) {
             <TableBody>
               {filteredRecords.map((record) => (
                 <TableRow key={record.id}>
-                  <TableCell>{record.id}</TableCell>
-                  {!isEmployeeView && <TableCell>{record.employeeName}</TableCell>}
+                  <TableCell>{record.payroll_id}</TableCell>
+                  {!isEmployeeView && <TableCell>{record.employee_name}</TableCell>}
                   {!isEmployeeView && <TableCell className="text-sm">{record.position}</TableCell>}
                   <TableCell>{record.period}</TableCell>
-                  <TableCell>{record.daysWorked}</TableCell>
-                  <TableCell>₱{record.grossPay.toLocaleString()}</TableCell>
-                  <TableCell>₱{record.deductions.toLocaleString()}</TableCell>
-                  <TableCell>₱{record.netPay.toLocaleString()}</TableCell>
+                  <TableCell>{record.days_worked}</TableCell>
+                  <TableCell>₱{Number(record.gross_pay).toLocaleString()}</TableCell>
+                  <TableCell>₱{Number(record.deductions).toLocaleString()}</TableCell>
+                  <TableCell>₱{Number(record.net_pay).toLocaleString()}</TableCell>
                   <TableCell>
                     <Badge 
                       variant={
@@ -526,11 +549,19 @@ export function PayrollModule({}: PayrollModuleProps) {
                       {record.status !== 'Paid' && (
                         <Select
                           value={record.status}
-                          onValueChange={(v) => {
-                            setPayrollRecords(payrollRecords.map(r => 
-                              r.id === record.id ? {...r, status: v as PayrollRecord['status']} : r
-                            ));
-                            toast.success('Payroll status updated');
+                          onValueChange={async (v: string) => {
+                            try {
+                              await apiFetch(`/payroll/${record.id}/update-status/`, {
+                                method: 'POST',
+                                body: JSON.stringify({ status: v })
+                              });
+                              setPayrollRecords(payrollRecords.map(r => 
+                                r.id === record.id ? {...r, status: v as PayrollRecord['status']} : r
+                              ));
+                              toast.success('Payroll status updated');
+                            } catch(e: any) {
+                              toast.error('Failed to update: ' + e.message);
+                            }
                           }}
                         >
                           <SelectTrigger className="w-32">
@@ -561,13 +592,13 @@ export function PayrollModule({}: PayrollModuleProps) {
             <div className="space-y-4">
               <div>
                 <p className="text-xs text-gray-500">Employee</p>
-                <p className="font-medium">{selectedPayslip.employeeName}</p>
+                <p className="font-medium">{selectedPayslip.employee_name}</p>
                 <p className="text-xs text-gray-500">{selectedPayslip.position}</p>
               </div>
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <p className="text-gray-500 text-xs">Payroll ID</p>
-                  <p>{selectedPayslip.id}</p>
+                  <p>{selectedPayslip.payroll_id}</p>
                 </div>
                 <div>
                   <p className="text-gray-500 text-xs">Period</p>
@@ -575,29 +606,25 @@ export function PayrollModule({}: PayrollModuleProps) {
                 </div>
                 <div>
                   <p className="text-gray-500 text-xs">Days Worked</p>
-                  <p>{selectedPayslip.daysWorked}</p>
+                  <p>{selectedPayslip.days_worked}</p>
                 </div>
-                <div>
-                  <p className="text-gray-500 text-xs">Daily Rate</p>
-                  <p>₱{selectedPayslip.dailyRate.toLocaleString()}</p>
+                <div className="flex justify-between">
+                  <span>Daily Rate</span>
+                  <span>₱{Number(selectedPayslip.daily_rate || 0).toLocaleString()}</span>
                 </div>
               </div>
               <div className="border rounded-lg p-3 text-sm space-y-1">
                 <div className="flex justify-between">
-                  <span>Basic Pay</span>
-                  <span>₱{selectedPayslip.grossPay.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Allowances (5%)</span>
-                  <span>₱{(selectedPayslip.grossPay * 0.05).toLocaleString()}</span>
+                  <span>Gross Pay</span>
+                  <span>₱{Number(selectedPayslip.gross_pay || 0).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between text-red-600">
-                  <span>Deductions</span>
-                  <span>₱{selectedPayslip.deductions.toLocaleString()}</span>
+                  <span>Deductions (10%)</span>
+                  <span>₱{Number(selectedPayslip.deductions || 0).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between font-semibold border-t pt-2 mt-1">
                   <span>Net Pay</span>
-                  <span>₱{selectedPayslip.netPay.toLocaleString()}</span>
+                  <span>₱{Number(selectedPayslip.net_pay || 0).toLocaleString()}</span>
                 </div>
               </div>
               <div className="flex justify-end gap-2">

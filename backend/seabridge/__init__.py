@@ -1,0 +1,1 @@
+# seabridge project package

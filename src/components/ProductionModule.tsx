@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -10,30 +10,39 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Badge } from './ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Plus, ClipboardCheck, Users, Calendar } from 'lucide-react';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
+import { apiFetch } from '../api';
 
 interface ProductionModuleProps {
   userRole: string;
 }
 
+interface Project {
+  id: number;
+  project_id: string;
+  name: string;
+}
+
 interface Task {
-  id: string;
-  projectId: string;
-  projectName: string;
-  taskName: string;
-  assignedTo: string;
-  assignedBy: string;
+  id: number;
+  task_id: string;
+  project: number;
+  project_name: string;
+  task_name: string;
+  assigned_to: string;
+  assigned_by: string;
   status: 'Pending' | 'In Progress' | 'Completed';
   deadline: string;
-  createdDate: string;
+  created_date: string;
   description: string;
 }
 
 interface QualityCheck {
-  id: string;
-  projectId: string;
-  projectName: string;
-  inspectionItem: string;
+  id: number;
+  qc_id: string;
+  project: number;
+  project_name: string;
+  inspection_item: string;
   inspector: string;
   result: 'Pass' | 'Fail';
   notes: string;
@@ -44,69 +53,87 @@ export function ProductionModule({ userRole }: ProductionModuleProps) {
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [isQCDialogOpen, setIsQCDialogOpen] = useState(false);
 
-  const [tasks, setTasks] = useState<Task[]>([
-    { id: 'TSK-001', projectId: 'PRJ-001', projectName: 'Coast Guard Patrol Boat', taskName: 'Hull Welding', assignedTo: 'Juan dela Cruz', assignedBy: 'Manager', status: 'In Progress', deadline: '2025-11-12', createdDate: '2025-11-05', description: 'Complete welding of main hull sections' },
-    { id: 'TSK-002', projectId: 'PRJ-001', projectName: 'Coast Guard Patrol Boat', taskName: 'Engine Installation', assignedTo: 'Pedro Santos', assignedBy: 'Manager', status: 'Pending', deadline: '2025-11-15', createdDate: '2025-11-06', description: 'Install and test Yamaha 250HP engine' },
-    { id: 'TSK-003', projectId: 'PRJ-002', projectName: 'Municipal Fishing Vessel', taskName: 'Deck Construction', assignedTo: 'Maria Garcia', assignedBy: 'Manager', status: 'In Progress', deadline: '2025-11-10', createdDate: '2025-11-04', description: 'Build and install deck structure' },
-    { id: 'TSK-004', projectId: 'PRJ-003', projectName: 'Private Yacht Customization', taskName: 'Interior Finishing', assignedTo: 'Jose Reyes', assignedBy: 'Manager', status: 'Completed', deadline: '2025-11-08', createdDate: '2025-11-01', description: 'Complete interior woodwork and upholstery' },
-    { id: 'TSK-005', projectId: 'PRJ-003', projectName: 'Private Yacht Customization', taskName: 'Final Paint Job', assignedTo: 'Roberto Cruz', assignedBy: 'Manager', status: 'In Progress', deadline: '2025-11-11', createdDate: '2025-11-07', description: 'Apply final coat of marine paint' },
-  ]);
-
-  const [qualityChecks, setQualityChecks] = useState<QualityCheck[]>([
-    { id: 'QC-001', projectId: 'PRJ-003', projectName: 'Private Yacht Customization', inspectionItem: 'Hull Integrity', inspector: 'Foreman QC', result: 'Pass', notes: 'All welds inspected. No defects found.', date: '2025-11-08' },
-    { id: 'QC-002', projectId: 'PRJ-001', projectName: 'Coast Guard Patrol Boat', inspectionItem: 'Engine Mount', inspector: 'Foreman QC', result: 'Pass', notes: 'Mounting bolts properly torqued.', date: '2025-11-07' },
-    { id: 'QC-003', projectId: 'PRJ-002', projectName: 'Municipal Fishing Vessel', inspectionItem: 'Deck Coating', inspector: 'Foreman QC', result: 'Fail', notes: 'Uneven coating in stern area. Requires rework.', date: '2025-11-06' },
-    { id: 'QC-004', projectId: 'PRJ-001', projectName: 'Coast Guard Patrol Boat', inspectionItem: 'Electrical System', inspector: 'Foreman QC', result: 'Pass', notes: 'All connections tested. Systems operational.', date: '2025-11-05' },
-    { id: 'QC-005', projectId: 'PRJ-003', projectName: 'Private Yacht Customization', inspectionItem: 'Fuel System', inspector: 'Foreman QC', result: 'Pass', notes: 'Pressure test completed successfully.', date: '2025-11-04' },
-  ]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [qualityChecks, setQualityChecks] = useState<QualityCheck[]>([]);
 
   const [newTask, setNewTask] = useState({
-    projectId: '',
-    projectName: '',
-    taskName: '',
-    assignedTo: '',
+    project: '', 
+    task_name: '',
+    assigned_to: '',
     deadline: '',
     description: ''
   });
 
   const [newQC, setNewQC] = useState({
-    projectId: '',
-    projectName: '',
-    inspectionItem: '',
+    project: '',
+    inspection_item: '',
     result: 'Pass' as 'Pass' | 'Fail',
     notes: ''
   });
 
   const workers = ['Juan dela Cruz', 'Pedro Santos', 'Maria Garcia', 'Jose Reyes', 'Roberto Cruz', 'Ana Lopez', 'Carlos Mendoza'];
-  const projects = ['PRJ-001 - Coast Guard Patrol Boat', 'PRJ-002 - Municipal Fishing Vessel', 'PRJ-003 - Private Yacht Customization', 'PRJ-004 - BFAR Monitoring Boat'];
 
-  const handleAddTask = () => {
-    const newId = `TSK-${String(tasks.length + 1).padStart(3, '0')}`;
-    const task: Task = {
-      id: newId,
-      ...newTask,
-      assignedBy: userRole.charAt(0).toUpperCase() + userRole.slice(1),
-      status: 'Pending',
-      createdDate: new Date().toISOString().split('T')[0]
-    };
-    setTasks([...tasks, task]);
-    setIsTaskDialogOpen(false);
-    setNewTask({ projectId: '', projectName: '', taskName: '', assignedTo: '', deadline: '', description: '' });
-    toast.success('Task assigned successfully');
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      const [projData, taskData, qcData] = await Promise.all([
+        apiFetch('/projects/'),
+        apiFetch('/tasks/'),
+        apiFetch('/quality-checks/').catch(() => []) // Workers might get 403 or empty, we handle it
+      ]);
+      setProjects(projData);
+      setTasks(taskData);
+      setQualityChecks(qcData);
+    } catch (e: any) {
+      toast.error('Failed to load production data: ' + e.message);
+    }
   };
 
-  const handleAddQC = () => {
-    const newId = `QC-${String(qualityChecks.length + 1).padStart(3, '0')}`;
-    const qc: QualityCheck = {
-      id: newId,
-      ...newQC,
-      inspector: userRole.charAt(0).toUpperCase() + userRole.slice(1),
-      date: new Date().toISOString().split('T')[0]
-    };
-    setQualityChecks([...qualityChecks, qc]);
-    setIsQCDialogOpen(false);
-    setNewQC({ projectId: '', projectName: '', inspectionItem: '', result: 'Pass', notes: '' });
-    toast.success('Quality check recorded');
+  const handleAddTask = async () => {
+    try {
+      const payload = {
+        project: Number(newTask.project),
+        task_name: newTask.task_name,
+        assigned_to: newTask.assigned_to,
+        deadline: newTask.deadline,
+        description: newTask.description
+      };
+      const savedTask = await apiFetch('/tasks/', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+      setTasks([...tasks, savedTask]);
+      setIsTaskDialogOpen(false);
+      setNewTask({ project: '', task_name: '', assigned_to: '', deadline: '', description: '' });
+      toast.success('Task assigned successfully');
+    } catch(e: any) {
+      toast.error('Failed to assign task: ' + e.message);
+    }
+  };
+
+  const handleAddQC = async () => {
+    try {
+      const payload = {
+        project: Number(newQC.project),
+        inspection_item: newQC.inspection_item,
+        result: newQC.result,
+        notes: newQC.notes
+      };
+      const savedQC = await apiFetch('/quality-checks/', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+      setQualityChecks([...qualityChecks, savedQC]);
+      setIsQCDialogOpen(false);
+      setNewQC({ project: '', inspection_item: '', result: 'Pass', notes: '' });
+      toast.success('Quality check recorded');
+    } catch (e: any) {
+      toast.error('Failed to save quality check: ' + e.message);
+    }
   };
 
   // Role-based permissions
@@ -114,19 +141,16 @@ export function ProductionModule({ userRole }: ProductionModuleProps) {
   const canPerformQC = ['owner', 'foreman'].includes(userRole);
   const canViewQC = ['owner', 'manager', 'foreman'].includes(userRole);
   const isWorker = userRole === 'worker';
-  const currentUser = userRole === 'worker' ? 'Juan dela Cruz' : null; // Mock current user for workers
 
-  const pendingTasks = tasks.filter(t => t.status === 'Pending').length;
-  const inProgressTasks = tasks.filter(t => t.status === 'In Progress').length;
-  const completedTasks = tasks.filter(t => t.status === 'Completed').length;
+  const pendingTasks = tasks.filter((t: Task) => t.status === 'Pending').length;
+  const inProgressTasks = tasks.filter((t: Task) => t.status === 'In Progress').length;
+  const completedTasks = tasks.filter((t: Task) => t.status === 'Completed').length;
   const passRate = qualityChecks.length > 0 
-    ? Math.round((qualityChecks.filter(q => q.result === 'Pass').length / qualityChecks.length) * 100)
+    ? Math.round((qualityChecks.filter((q: QualityCheck) => q.result === 'Pass').length / qualityChecks.length) * 100)
     : 0;
 
-  // Filter tasks for workers to show only their assigned tasks
-  const visibleTasks = isWorker && currentUser 
-    ? tasks.filter(t => t.assignedTo === currentUser)
-    : tasks;
+  // With API, tasks are already filtered for workers!
+  const visibleTasks = tasks;
 
   return (
     <div className="space-y-6">
@@ -197,18 +221,15 @@ export function ProductionModule({ userRole }: ProductionModuleProps) {
                     <div className="space-y-2">
                       <Label>Project</Label>
                       <Select 
-                        value={newTask.projectId}
-                        onValueChange={(v) => {
-                          const [id, ...name] = v.split(' - ');
-                          setNewTask({...newTask, projectId: id, projectName: name.join(' - ')});
-                        }}
+                        value={newTask.project}
+                        onValueChange={(v) => setNewTask({...newTask, project: v})}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select project" />
                         </SelectTrigger>
                         <SelectContent>
                           {projects.map(p => (
-                            <SelectItem key={p} value={p}>{p}</SelectItem>
+                            <SelectItem key={p.id} value={String(p.id)}>{`${p.project_id} - ${p.name}`}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -216,16 +237,16 @@ export function ProductionModule({ userRole }: ProductionModuleProps) {
                     <div className="space-y-2">
                       <Label>Task Name</Label>
                       <Input 
-                        value={newTask.taskName}
-                        onChange={(e) => setNewTask({...newTask, taskName: e.target.value})}
+                        value={newTask.task_name}
+                        onChange={(e) => setNewTask({...newTask, task_name: e.target.value})}
                         placeholder="e.g., Hull Welding"
                       />
                     </div>
                     <div className="space-y-2">
                       <Label>Assign To</Label>
                       <Select 
-                        value={newTask.assignedTo}
-                        onValueChange={(v) => setNewTask({...newTask, assignedTo: v})}
+                        value={newTask.assigned_to}
+                        onValueChange={(v) => setNewTask({...newTask, assigned_to: v})}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select worker" />
@@ -285,10 +306,10 @@ export function ProductionModule({ userRole }: ProductionModuleProps) {
                 <TableBody>
                   {visibleTasks.map((task) => (
                     <TableRow key={task.id}>
-                      <TableCell>{task.id}</TableCell>
-                      <TableCell className="text-sm">{task.projectName}</TableCell>
-                      <TableCell>{task.taskName}</TableCell>
-                      {!isWorker && <TableCell>{task.assignedTo}</TableCell>}
+                      <TableCell>{task.task_id}</TableCell>
+                      <TableCell className="text-sm">{task.project_name}</TableCell>
+                      <TableCell>{task.task_name}</TableCell>
+                      {!isWorker && <TableCell>{task.assigned_to}</TableCell>}
                       <TableCell>
                         <Badge 
                           variant={
@@ -301,16 +322,24 @@ export function ProductionModule({ userRole }: ProductionModuleProps) {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-sm">{task.deadline}</TableCell>
-                      {!isWorker && <TableCell className="text-sm">{task.assignedBy}</TableCell>}
+                      {!isWorker && <TableCell className="text-sm">{task.assigned_by}</TableCell>}
                       <TableCell>
                         {task.status !== 'Completed' && (isWorker || canAssignTasks || canPerformQC) && (
                           <Select
                             value={task.status}
-                            onValueChange={(v) => {
-                              setTasks(tasks.map(t => 
-                                t.id === task.id ? {...t, status: v as Task['status']} : t
-                              ));
-                              toast.success('Task status updated');
+                            onValueChange={async (v) => {
+                              try {
+                                await apiFetch(`/tasks/${task.id}/update-status/`, {
+                                  method: 'POST',
+                                  body: JSON.stringify({ status: v })
+                                });
+                                setTasks(tasks.map(t => 
+                                  t.id === task.id ? {...t, status: v as Task['status']} : t
+                                ));
+                                toast.success('Task status updated');
+                              } catch(e: any) {
+                                toast.error('Failed to update: ' + e.message);
+                              }
                             }}
                           >
                             <SelectTrigger className="w-32">
@@ -351,18 +380,15 @@ export function ProductionModule({ userRole }: ProductionModuleProps) {
                     <div className="space-y-2">
                       <Label>Project</Label>
                       <Select 
-                        value={newQC.projectId}
-                        onValueChange={(v) => {
-                          const [id, ...name] = v.split(' - ');
-                          setNewQC({...newQC, projectId: id, projectName: name.join(' - ')});
-                        }}
+                        value={newQC.project}
+                        onValueChange={(v) => setNewQC({...newQC, project: v})}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select project" />
                         </SelectTrigger>
                         <SelectContent>
                           {projects.map(p => (
-                            <SelectItem key={p} value={p}>{p}</SelectItem>
+                            <SelectItem key={p.id} value={String(p.id)}>{`${p.project_id} - ${p.name}`}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -370,8 +396,8 @@ export function ProductionModule({ userRole }: ProductionModuleProps) {
                     <div className="space-y-2">
                       <Label>Inspection Item</Label>
                       <Input 
-                        value={newQC.inspectionItem}
-                        onChange={(e) => setNewQC({...newQC, inspectionItem: e.target.value})}
+                        value={newQC.inspection_item}
+                        onChange={(e) => setNewQC({...newQC, inspection_item: e.target.value})}
                         placeholder="e.g., Hull Integrity, Engine Mount"
                       />
                     </div>
@@ -429,9 +455,9 @@ export function ProductionModule({ userRole }: ProductionModuleProps) {
                 <TableBody>
                   {qualityChecks.map((qc) => (
                     <TableRow key={qc.id}>
-                      <TableCell>{qc.id}</TableCell>
-                      <TableCell className="text-sm">{qc.projectName}</TableCell>
-                      <TableCell>{qc.inspectionItem}</TableCell>
+                      <TableCell>{qc.qc_id}</TableCell>
+                      <TableCell className="text-sm">{qc.project_name}</TableCell>
+                      <TableCell>{qc.inspection_item}</TableCell>
                       <TableCell>{qc.inspector}</TableCell>
                       <TableCell>
                         <Badge variant={qc.result === 'Pass' ? 'default' : 'destructive'}>

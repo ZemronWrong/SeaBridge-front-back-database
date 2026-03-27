@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -8,49 +8,46 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Badge } from './ui/badge';
 import { Plus, Search, AlertTriangle, Package, Edit } from 'lucide-react';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
+import { useAuth } from '../context/AuthContext';
+import { apiFetch } from '../api';
 
-interface InventoryModuleProps {
-  userRole: string;
-}
+interface InventoryModuleProps {}
 
 interface Material {
-  id: string;
+  id: number;
+  material_id: string;
   name: string;
   category: string;
   quantity: number;
   unit: string;
-  minStock: number;
-  unitPrice: number;
+  min_stock: number;
+  unit_price: string | number;
   supplier: string;
-  lastUpdated: string;
+  last_updated: string;
+  total_value?: string | number;
+  stock_status?: string;
 }
 
-export function InventoryModule({ userRole }: InventoryModuleProps) {
+export function InventoryModule() {
+  const { user } = useAuth();
+  const userRole = user?.role || 'worker';
+  
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
   const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null);
 
-  const [materials, setMaterials] = useState<Material[]>([
-    { id: 'MAT-001', name: 'Marine Plywood 4x8', category: 'Wood', quantity: 12, unit: 'sheets', minStock: 20, unitPrice: 2500, supplier: 'Davao Lumber Supply', lastUpdated: '2025-11-08' },
-    { id: 'MAT-002', name: 'Epoxy Resin', category: 'Chemicals', quantity: 15, unit: 'liters', minStock: 25, unitPrice: 850, supplier: 'Marine Tech Philippines', lastUpdated: '2025-11-07' },
-    { id: 'MAT-003', name: 'Fiberglass Cloth', category: 'Fabric', quantity: 8, unit: 'rolls', minStock: 15, unitPrice: 1200, supplier: 'Composite Materials Inc', lastUpdated: '2025-11-06' },
-    { id: 'MAT-004', name: 'Stainless Steel Bolts M12', category: 'Hardware', quantity: 45, unit: 'pcs', minStock: 100, unitPrice: 15, supplier: 'Steel & Fasteners Co', lastUpdated: '2025-11-08' },
-    { id: 'MAT-005', name: 'Marine Paint (White)', category: 'Paint', quantity: 35, unit: 'liters', minStock: 20, unitPrice: 750, supplier: 'Marine Coatings Ltd', lastUpdated: '2025-11-05' },
-    { id: 'MAT-006', name: 'Yamaha 250HP Engine', category: 'Engine', quantity: 2, unit: 'units', minStock: 2, unitPrice: 450000, supplier: 'Yamaha Marine Davao', lastUpdated: '2025-11-01' },
-    { id: 'MAT-007', name: 'Aluminum Sheet 4x8', category: 'Metal', quantity: 25, unit: 'sheets', minStock: 15, unitPrice: 3200, supplier: 'Metro Aluminum', lastUpdated: '2025-11-08' },
-    { id: 'MAT-008', name: 'Hydraulic Steering System', category: 'Equipment', quantity: 5, unit: 'units', minStock: 3, unitPrice: 25000, supplier: 'Marine Parts Depot', lastUpdated: '2025-11-04' },
-  ]);
+  const [materials, setMaterials] = useState<Material[]>([]);
 
   const [newMaterial, setNewMaterial] = useState({
     name: '',
     category: '',
     quantity: 0,
     unit: '',
-    minStock: 0,
-    unitPrice: 0,
+    min_stock: 0,
+    unit_price: 0,
     supplier: ''
   });
 
@@ -59,57 +56,85 @@ export function InventoryModule({ userRole }: InventoryModuleProps) {
     operation: 'add'
   });
 
+  useEffect(() => {
+    fetchMaterials();
+  }, []);
+
+  const fetchMaterials = async () => {
+    try {
+      const data = await apiFetch('/materials/');
+      setMaterials(data);
+    } catch (error: any) {
+      toast.error('Failed to load materials: ' + error.message);
+    }
+  };
+
   const filteredMaterials = materials.filter((material) => {
     const matchesSearch = material.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         material.id.toLowerCase().includes(searchTerm.toLowerCase());
+                         material.material_id.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = filterCategory === 'all' || material.category === filterCategory;
     return matchesSearch && matchesCategory;
   });
 
   const categories = ['all', ...Array.from(new Set(materials.map(m => m.category)))];
 
-  const handleAddMaterial = () => {
-    const newId = `MAT-${String(materials.length + 1).padStart(3, '0')}`;
-    const material: Material = {
-      id: newId,
-      ...newMaterial,
-      lastUpdated: new Date().toISOString().split('T')[0]
-    };
-    setMaterials([...materials, material]);
-    setIsAddDialogOpen(false);
-    setNewMaterial({ name: '', category: '', quantity: 0, unit: '', minStock: 0, unitPrice: 0, supplier: '' });
-    toast.success('Material added successfully');
+  const handleAddMaterial = async () => {
+    try {
+      // Backend automatically sets ID if needed, but we pass what it needs or backend will generate.
+      // Wait, backend material_id requires explicitly passing it or auto-generating. Let's auto-generate fallback if needed.
+      const payload = {
+        ...newMaterial,
+        material_id: `MAT-${String(materials.length + 1).padStart(3, '0')}` // Simple generation, you could also modify backend to auto-generate
+      };
+      
+      const savedMaterial = await apiFetch('/materials/', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+      setMaterials([...materials, savedMaterial]);
+      setIsAddDialogOpen(false);
+      setNewMaterial({ name: '', category: '', quantity: 0, unit: '', min_stock: 0, unit_price: 0, supplier: '' });
+      toast.success('Material added successfully');
+    } catch (e: any) {
+      toast.error('Failed to add material: ' + e.message);
+    }
   };
 
-  const handleUpdateStock = () => {
+  const handleUpdateStock = async () => {
     if (!selectedMaterial) return;
-    
-    setMaterials(materials.map(m => {
-      if (m.id === selectedMaterial.id) {
-        const newQuantity = updateStock.operation === 'add' 
-          ? m.quantity + updateStock.quantity 
-          : Math.max(0, m.quantity - updateStock.quantity);
-        return { ...m, quantity: newQuantity, lastUpdated: new Date().toISOString().split('T')[0] };
-      }
-      return m;
-    }));
-    
-    setIsUpdateDialogOpen(false);
-    setUpdateStock({ quantity: 0, operation: 'add' });
-    toast.success('Stock updated successfully');
+    if (updateStock.quantity < 1) {
+      toast.error('Quantity must be greater than or equal to 1.');
+      return;
+    }
+    try {
+      const updatedMaterial = await apiFetch(`/materials/${selectedMaterial.id}/update-stock/`, {
+        method: 'POST',
+        body: JSON.stringify({
+          quantity: updateStock.quantity,
+          operation: updateStock.operation
+        })
+      });
+      setMaterials(materials.map(m => m.id === updatedMaterial.id ? updatedMaterial : m));
+      setIsUpdateDialogOpen(false);
+      setUpdateStock({ quantity: 0, operation: 'add' });
+      toast.success('Stock updated successfully');
+    } catch(e: any) {
+      toast.error('Failed to update stock: ' + e.message);
+    }
   };
 
   const getStockStatus = (material: Material) => {
-    if (material.quantity <= material.minStock) {
+    const status = material.stock_status || (material.quantity <= material.min_stock ? 'Low Stock' : 'Good');
+    if (status === 'Low Stock') {
       return <Badge variant="destructive">Low Stock</Badge>;
-    } else if (material.quantity <= material.minStock * 1.5) {
+    } else if (status === 'Warning') {
       return <Badge className="bg-orange-500">Warning</Badge>;
     }
     return <Badge className="bg-green-600">Good</Badge>;
   };
 
-  const lowStockCount = materials.filter(m => m.quantity <= m.minStock).length;
-  const totalValue = materials.reduce((sum, m) => sum + (m.quantity * m.unitPrice), 0);
+  const lowStockCount = Array.isArray(materials) ? materials.filter(m => m.quantity <= (m.min_stock || 0)).length : 0;
+  const totalValue = Array.isArray(materials) ? materials.reduce((sum, m) => sum + ((m.quantity || 0) * Number(m.unit_price || 0)), 0) : 0;
 
   // Role-based permissions
   const canAddMaterial = ['owner', 'finance'].includes(userRole);
@@ -174,16 +199,16 @@ export function InventoryModule({ userRole }: InventoryModuleProps) {
                   <Label>Minimum Stock Level</Label>
                   <Input 
                     type="number"
-                    value={newMaterial.minStock}
-                    onChange={(e) => setNewMaterial({...newMaterial, minStock: Number(e.target.value)})}
+                    value={newMaterial.min_stock}
+                    onChange={(e) => setNewMaterial({...newMaterial, min_stock: Number(e.target.value)})}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label>Unit Price (₱)</Label>
                   <Input 
                     type="number"
-                    value={newMaterial.unitPrice}
-                    onChange={(e) => setNewMaterial({...newMaterial, unitPrice: Number(e.target.value)})}
+                    value={newMaterial.unit_price}
+                    onChange={(e) => setNewMaterial({...newMaterial, unit_price: Number(e.target.value)})}
                   />
                 </div>
                 <div className="space-y-2 col-span-2">
@@ -297,13 +322,13 @@ export function InventoryModule({ userRole }: InventoryModuleProps) {
                   <TableCell>{material.id}</TableCell>
                   <TableCell>{material.name}</TableCell>
                   <TableCell>{material.category}</TableCell>
-                  <TableCell>{material.quantity} {material.unit}</TableCell>
-                  <TableCell>{material.minStock} {material.unit}</TableCell>
+                  <TableCell>{material.quantity || 0} {material.unit}</TableCell>
+                  <TableCell>{material.min_stock || 0} {material.unit}</TableCell>
                   <TableCell>{getStockStatus(material)}</TableCell>
-                  <TableCell>₱{material.unitPrice.toLocaleString()}</TableCell>
-                  <TableCell>₱{(material.quantity * material.unitPrice).toLocaleString()}</TableCell>
+                  <TableCell>₱{Number(material.unit_price || 0).toLocaleString()}</TableCell>
+                  <TableCell>₱{((material.quantity || 0) * Number(material.unit_price || 0)).toLocaleString()}</TableCell>
                   <TableCell className="text-sm">{material.supplier}</TableCell>
-                  <TableCell className="text-sm">{material.lastUpdated}</TableCell>
+                  <TableCell className="text-sm">{material.last_updated ? material.last_updated.substring(0, 10) : '-'}</TableCell>
                   {canUpdateStock && (
                     <TableCell>
                       <Button 
@@ -339,7 +364,7 @@ export function InventoryModule({ userRole }: InventoryModuleProps) {
             </div>
             <div className="space-y-2">
               <Label>Operation</Label>
-              <Select value={updateStock.operation} onValueChange={(v) => setUpdateStock({...updateStock, operation: v})}>
+              <Select value={updateStock.operation} onValueChange={(v: string) => setUpdateStock({...updateStock, operation: v})}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -6,147 +6,107 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Input } from './ui/input';
 import { Calendar, Clock, Download } from 'lucide-react';
+import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
+import { apiFetch } from '../api';
 
 type DTRStatus = 'Present' | 'Absent' | 'On Leave';
 
 interface DTRRecord {
-  id: string;
-  employeeId: string;
-  employeeName: string;
-  teamId: string;
+  id: number;
+  dtr_id: string;
+  employee: number;
+  employee_name: string;
+  team_id: string;
   date: string;
-  timeIn: string;
-  timeOut: string;
-  breakMinutes: number;
-  overtimeHours: number;
+  time_in: string | null;
+  time_out: string | null;
+  break_minutes: number;
+  overtime_hours: string | number;
   status: DTRStatus;
 }
 
-const initialDtrRecords: DTRRecord[] = [
-  {
-    id: 'DTR-001',
-    employeeId: 'EMP-001',
-    employeeName: 'Juan dela Cruz',
-    teamId: 'TEAM-A',
-    date: '2025-11-07',
-    timeIn: '08:00',
-    timeOut: '17:30',
-    breakMinutes: 60,
-    overtimeHours: 1.5,
-    status: 'Present',
-  },
-  {
-    id: 'DTR-002',
-    employeeId: 'EMP-002',
-    employeeName: 'Pedro Santos',
-    teamId: 'TEAM-A',
-    date: '2025-11-07',
-    timeIn: '08:15',
-    timeOut: '17:00',
-    breakMinutes: 60,
-    overtimeHours: 0,
-    status: 'Present',
-  },
-  {
-    id: 'DTR-003',
-    employeeId: 'EMP-003',
-    employeeName: 'Maria Garcia',
-    teamId: 'TEAM-A',
-    date: '2025-11-07',
-    timeIn: '08:05',
-    timeOut: '16:30',
-    breakMinutes: 45,
-    overtimeHours: 0,
-    status: 'Present',
-  },
-  {
-    id: 'DTR-004',
-    employeeId: 'EMP-004',
-    employeeName: 'Jose Reyes',
-    teamId: 'TEAM-A',
-    date: '2025-11-07',
-    timeIn: '-',
-    timeOut: '-',
-    breakMinutes: 0,
-    overtimeHours: 0,
-    status: 'On Leave',
-  },
-];
-
 export function DTRModule() {
   const { user } = useAuth();
-  const [records, setRecords] = useState<DTRRecord[]>(initialDtrRecords);
+  const [records, setRecords] = useState<DTRRecord[]>([]);
   const [periodFilter, setPeriodFilter] = useState<'today' | 'week' | 'month' | 'all'>('today');
   const [dateFilter, setDateFilter] = useState('');
+  const [loading, setLoading] = useState(true);
 
-  const today = '2025-11-07';
+  // Use local date for "today"
+  const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD format
 
-  const canApproveOvertime = user?.role === 'manager' || user?.role === 'owner';
   const isEmployee = user?.role === 'worker' || user?.role === 'foreman';
 
-  const currentEmployeeId = isEmployee ? user?.employeeId : undefined;
-  const currentTeamId = user?.teamId;
-
-  const filteredByRole = records.filter((r) => {
-    if (user?.role === 'owner' || user?.role === 'finance') return true;
-    if (user?.role === 'manager') {
-      if (!currentTeamId) return false;
-      return r.teamId === currentTeamId;
+  const fetchDTR = async () => {
+    try {
+      setLoading(true);
+      const data = await apiFetch('/dtr/');
+      setRecords(data);
+    } catch (e: any) {
+      toast.error('Failed to load DTR: ' + e.message);
+    } finally {
+      setLoading(false);
     }
-    if (isEmployee && currentEmployeeId) {
-      return r.employeeId === currentEmployeeId;
-    }
-    return false;
-  });
+  };
 
-  const filteredByPeriod = filteredByRole.filter((r) => {
+  useEffect(() => {
+    fetchDTR();
+  }, []);
+
+  // Filter records based on selected period logic (frontend)
+  const filteredByPeriod = records.filter((r) => {
     if (dateFilter) {
       return r.date === dateFilter;
     }
     if (periodFilter === 'today') return r.date === today;
-    if (periodFilter === 'week') return true;
-    if (periodFilter === 'month') return true;
-    return true;
+    
+    if (periodFilter === 'week') {
+       const recDate = new Date(r.date);
+       const now = new Date();
+       const diffTime = Math.abs(now.getTime() - recDate.getTime());
+       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+       return diffDays <= 7;
+    }
+    if (periodFilter === 'month') {
+       return r.date.substring(0, 7) === today.substring(0, 7);
+    }
+    return true; // all
   });
 
-  const handleClockIn = () => {
-    if (!currentEmployeeId || !user) return;
-
-    const existing = records.find((r) => r.date === today && r.employeeId === currentEmployeeId);
-    if (existing) return;
-
-    const newRecord: DTRRecord = {
-      id: `DTR-${String(records.length + 1).padStart(3, '0')}`,
-      employeeId: currentEmployeeId,
-      employeeName: user.name,
-      teamId: currentTeamId ?? 'TEAM-A',
-      date: today,
-      timeIn: '08:00',
-      timeOut: '-',
-      breakMinutes: 0,
-      overtimeHours: 0,
-      status: 'Present',
-    };
-
-    setRecords((prev) => [...prev, newRecord]);
+  const handleClockIn = async () => {
+    try {
+      const resp = await apiFetch('/dtr/clock-in/', {
+        method: 'POST',
+        body: JSON.stringify({ time_in: new Date().toLocaleTimeString([], { hour12: false }) })
+      });
+      setRecords((prev) => [...prev, resp]);
+      toast.success('Clocked in successfully');
+    } catch(e: any) {
+      toast.error('Clock-in failed: ' + e.message);
+    }
   };
 
-  const handleClockOut = () => {
-    if (!currentEmployeeId) return;
-    setRecords((prev) =>
-      prev.map((r) =>
-        r.date === today && r.employeeId === currentEmployeeId
-          ? { ...r, timeOut: '17:00', overtimeHours: 0.5 }
-          : r
-      )
-    );
+  const handleClockOut = async () => {
+    try {
+      const resp = await apiFetch('/dtr/clock-out/', {
+        method: 'POST',
+        body: JSON.stringify({ 
+           time_out: new Date().toLocaleTimeString([], { hour12: false }),
+           break_minutes: 60, // Default break
+           overtime_hours: 0  // Default overtime (needs manual adjustment normally)
+        })
+      });
+      setRecords((prev) => prev.map(r => r.id === resp.id ? resp : r));
+      toast.success('Clocked out successfully');
+    } catch(e: any) {
+      toast.error('Clock-out failed: ' + e.message);
+    }
   };
 
   const exportToCsv = () => {
     const header = [
       'DTR ID',
-      'Employee ID',
       'Employee Name',
       'Team',
       'Date',
@@ -157,18 +117,17 @@ export function DTRModule() {
       'Status',
     ];
     const rows = filteredByPeriod.map((r) => [
-      r.id,
-      r.employeeId,
-      r.employeeName,
-      r.teamId,
+      r.dtr_id,
+      r.employee_name,
+      r.team_id,
       r.date,
-      r.timeIn,
-      r.timeOut,
-      String(r.breakMinutes),
-      String(r.overtimeHours),
+      r.time_in || '-',
+      r.time_out || '-',
+      String(r.break_minutes),
+      String(r.overtime_hours),
       r.status,
     ]);
-    const csvContent = [header, ...rows].map((row) => row.join(',')).join('\n');
+    const csvContent = [header, ...rows].map((row) => row.join(',')).join('\\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -277,33 +236,40 @@ export function DTRModule() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredByPeriod.map((rec) => (
-                <TableRow key={rec.id}>
-                  <TableCell>{rec.date}</TableCell>
-                  {!isEmployee && <TableCell>{rec.employeeName}</TableCell>}
-                  {!isEmployee && <TableCell>{rec.teamId}</TableCell>}
-                  <TableCell>{rec.timeIn}</TableCell>
-                  <TableCell>{rec.timeOut}</TableCell>
-                  <TableCell>{rec.breakMinutes}</TableCell>
-                  <TableCell>{rec.overtimeHours}</TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={
-                        rec.status === 'Present'
-                          ? 'default'
-                          : rec.status === 'On Leave'
-                          ? 'secondary'
-                          : 'destructive'
-                      }
-                    >
-                      {rec.status}
-                    </Badge>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center text-sm text-gray-500 h-24">
+                    Loading records...
                   </TableCell>
                 </TableRow>
-              ))}
-              {filteredByPeriod.length === 0 && (
+              ) : filteredByPeriod.length > 0 ? (
+                filteredByPeriod.map((rec) => (
+                  <TableRow key={rec.id}>
+                    <TableCell>{rec.date}</TableCell>
+                    {!isEmployee && <TableCell>{rec.employee_name}</TableCell>}
+                    {!isEmployee && <TableCell>{rec.team_id}</TableCell>}
+                    <TableCell>{rec.time_in || '-'}</TableCell>
+                    <TableCell>{rec.time_out || '-'}</TableCell>
+                    <TableCell>{rec.break_minutes}</TableCell>
+                    <TableCell>{rec.overtime_hours}</TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={
+                          rec.status === 'Present'
+                            ? 'default'
+                            : rec.status === 'On Leave'
+                            ? 'secondary'
+                            : 'destructive'
+                        }
+                      >
+                        {rec.status}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center text-sm text-gray-500">
+                  <TableCell colSpan={8} className="text-center text-sm text-gray-500 h-24">
                     No DTR records found for the selected filters and role.
                   </TableCell>
                 </TableRow>

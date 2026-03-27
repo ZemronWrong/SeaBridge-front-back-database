@@ -16,45 +16,13 @@ type ViewId = 'dashboard' | 'inventory' | 'production' | 'payroll' | 'dtr';
 
 export default function App() {
   const [currentView, setCurrentView] = useState<ViewId>('dashboard');
-  const { user, loginAs } = useAuth();
+  const { user, login, isLoading } = useAuth();
 
-  const handleQuickLogin = (role: UserRole) => {
-    // Simple demo identities with sample employee/team mapping
-    if (role === 'owner') {
-      loginAs({
-        id: 'USR-OWNER-001',
-        name: 'Company Owner',
-        role: 'owner',
-      });
-    } else if (role === 'manager') {
-      loginAs({
-        id: 'USR-MGR-TEAM-A',
-        name: 'Team A Manager',
-        role: 'manager',
-        teamId: 'TEAM-A',
-      });
-    } else if (role === 'finance') {
-      loginAs({
-        id: 'USR-FIN-001',
-        name: 'Payroll Officer',
-        role: 'finance',
-      });
-    } else if (role === 'foreman') {
-      loginAs({
-        id: 'USR-FRM-001',
-        name: 'Foreman',
-        role: 'foreman',
-        teamId: 'TEAM-A',
-        employeeId: 'EMP-004',
-      });
-    } else {
-      loginAs({
-        id: 'USR-WRK-001',
-        name: 'Juan dela Cruz',
-        role: 'worker',
-        teamId: 'TEAM-A',
-        employeeId: 'EMP-001',
-      });
+  const handleQuickLogin = async (role: UserRole) => {
+    try {
+      await login(role, `${role}123`);
+    } catch (e) {
+      console.error("Login failed:", e);
     }
   };
 

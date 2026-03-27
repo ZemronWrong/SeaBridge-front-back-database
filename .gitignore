@@ -1,0 +1,27 @@
+# Dependency directories
+node_modules/
+backend/venv/
+backend/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Build outputs
+dist/
+build/
+.vite/
+
+# Local env files
+.env
+.env.local
+.env.*.local
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
