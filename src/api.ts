@@ -1,11 +1,20 @@
-const API_BASE_URL = 'http://127.0.0.1:8000/api';
+/** Base URL for API (no trailing slash). Dev default `/api` uses Vite proxy → Django :8000. */
+export function getApiBaseUrl(): string {
+  const raw = import.meta.env.VITE_API_URL as string | undefined;
+  if (raw != null && String(raw).trim() !== '') {
+    return String(raw).trim().replace(/\/$/, '');
+  }
+  return '/api';
+}
 
 export const getAuthToken = () => localStorage.getItem('auth_token');
 export const setAuthToken = (token: string) => localStorage.setItem('auth_token', token);
 export const removeAuthToken = () => localStorage.removeItem('auth_token');
 
 export async function apiFetch(endpoint: string, options: RequestInit = {}) {
-  const url = `${API_BASE_URL}${endpoint}`;
+  const base = getApiBaseUrl();
+  const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  const url = `${base}${path}`;
   const token = getAuthToken();
 
   const headers = new Headers(options.headers || {});

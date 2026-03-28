@@ -3,6 +3,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from accounts.permissions import CanManageProduction
+from payroll.models import Employee
 from .models import Project, Task, QualityCheck
 from .serializers import (
     ProjectSerializer,

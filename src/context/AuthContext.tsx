@@ -42,8 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
           const profile = await apiFetch('/auth/profile/');
           setUser(mapUser(profile));
-        } catch (e) {
-          console.error("Failed to fetch profile", e);
+        } catch {
           removeAuthToken();
         }
       }
@@ -72,8 +71,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (getAuthToken()) {
          await apiFetch('/auth/logout/', { method: 'POST' });
       }
-    } catch(e) {
-      console.error(e);
+    } catch {
+      // ignore network errors on logout
     } finally {
       removeAuthToken();
       setUser(null);

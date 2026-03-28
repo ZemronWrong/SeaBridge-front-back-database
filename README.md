@@ -49,22 +49,41 @@ Ensure you have the following installed:
 
 ## 🔥 Starting the Project
 
-To run the application, you need to start both the backend and the frontend servers concurrently.
+To run the application, you need the Django API and the Vite dev server. The frontend calls `/api` in development; Vite proxies those requests to `http://127.0.0.1:8000`.
 
-### 1. Start Backend (Django)
+### Environment (optional)
+
+Copy `.env.example` to `.env` (or `.env.local`). The default `VITE_API_URL=/api` matches the Vite proxy. For a build served without the proxy, set `VITE_API_URL` to your full backend URL (for example `http://127.0.0.1:8000/api`).
+
+### Option A — One command (recommended)
+
+From the repository root (with Python available and backend dependencies installed):
+
+```powershell
+npm run dev:full
+```
+
+This runs `python backend/manage.py runserver` and `vite` together via `concurrently`.
+
+### Option B — Two terminals
+
+**1. Backend (Django)**
+
 ```powershell
 cd backend
 .\venv\Scripts\Activate
 python manage.py runserver
 ```
-The API will be available at `http://127.0.0.1:8000/`.
 
-### 2. Start Frontend (Vite)
-Open a **new** terminal window:
+The API is at `http://127.0.0.1:8000/` (for example `http://127.0.0.1:8000/api/auth/login/`).
+
+**2. Frontend (Vite)**
+
 ```powershell
 npm run dev
 ```
-The Dashboard will be accessible at `http://localhost:5173/`.
+
+The app is at `http://localhost:3000/` (see `vite.config.ts`).
 
 ---
 

@@ -51,10 +51,17 @@
             "@types/react": "^19.2.14",
             "@types/react-dom": "^19.2.3",
             "@vitejs/plugin-react-swc": "^3.10.2",
-            "vite": "6.3.5"
+            "concurrently": "^9.1.2",
+            "vite": "^6.4.1",
+            "vitest": "^3.0.5"
       },
       "scripts": {
             "dev": "vite",
-            "build": "vite build"
+            "build": "vite build",
+            "preview": "vite preview",
+            "backend": "python backend/manage.py runserver",
+            "dev:full": "concurrently -n backend,web -c blue,green \"npm run backend\" \"npm run dev\"",
+            "test": "vitest run",
+            "test:watch": "vitest"
       }
 }
