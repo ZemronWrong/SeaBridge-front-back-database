@@ -1,4 +1,5 @@
-# Generated manually for Material Request workflow
+# Replaces legacy MaterialRequest table (from 0002) with the full workflow schema.
+# Safe when inventory_materialrequest has no rows (see migration plan).
 
 from django.conf import settings
 from django.db import migrations, models
@@ -10,10 +11,11 @@ class Migration(migrations.Migration):
     dependencies = [
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
         ('production', '0001_initial'),
-        ('inventory', '0001_initial'),
+        ('inventory', '0002_materialrequest'),
     ]
 
     operations = [
+        migrations.DeleteModel(name='MaterialRequest'),
         migrations.CreateModel(
             name='MaterialRequest',
             fields=[

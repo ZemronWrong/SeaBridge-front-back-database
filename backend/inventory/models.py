@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 
 
@@ -35,3 +36,50 @@ class Material(models.Model):
         elif self.quantity <= self.min_stock * 1.5:
             return 'Warning'
         return 'Good'
+
+
+class MaterialRequest(models.Model):
+    """
+    Foreman requests materials; Owner/Finance advance status and fulfill.
+    Stock is deducted when status becomes Fulfilled.
+    """
+
+    class Status(models.TextChoices):
+        PENDING = 'Pending', 'Pending'
+        APPROVED = 'Approved', 'Approved'
+        ORDERED = 'Ordered', 'Ordered'
+        FULFILLED = 'Fulfilled', 'Fulfilled'
+
+    request_id = models.CharField(max_length=20, unique=True, verbose_name='Request ID')
+    material = models.ForeignKey(
+        Material,
+        on_delete=models.CASCADE,
+        related_name='material_requests',
+    )
+    project = models.ForeignKey(
+        'production.Project',
+        on_delete=models.CASCADE,
+        related_name='material_requests',
+    )
+    quantity = models.PositiveIntegerField()
+    requester = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='material_requests',
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PENDING,
+    )
+    notes = models.TextField(blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at', 'request_id']
+        verbose_name = 'Material Request'
+        verbose_name_plural = 'Material Requests'
+
+    def __str__(self):
+        return f'{self.request_id} — {self.material_id} × {self.quantity} ({self.status})'

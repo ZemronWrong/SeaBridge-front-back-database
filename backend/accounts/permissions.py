@@ -64,3 +64,32 @@ class CanManageDTR(permissions.BasePermission):
     """Everyone authenticated can view DTR; only employees can clock in/out."""
     def has_permission(self, request, view):
         return request.user.is_authenticated
+
+
+class MaterialRequestPermission(permissions.BasePermission):
+    """
+    Foreman: create only; list/retrieve own requests.
+    Owner/Finance: list all, update status (approve/order/fulfill), delete.
+    Manager: read all requests.
+    """
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+        role = getattr(request.user, 'role', None)
+        if view.action == 'create':
+            return role == 'foreman'
+        if view.action in ('update', 'partial_update', 'destroy'):
+            return role in ('owner', 'finance')
+        if view.action in ('list', 'retrieve'):
+            return role in ('owner', 'finance', 'manager', 'foreman')
+        return False
+
+    def has_object_permission(self, request, view, obj):
+        role = getattr(request.user, 'role', None)
+        if view.action in ('update', 'partial_update', 'destroy'):
+            return role in ('owner', 'finance')
+        if view.action == 'retrieve':
+            if role == 'foreman':
+                return obj.requester_id == request.user.id
+            return role in ('owner', 'finance', 'manager')
+        return True
