@@ -1,10 +1,10 @@
-import { Ship, LayoutDashboard, Package, ClipboardCheck, Wallet, User, Clock } from 'lucide-react';
+import { Ship, LayoutDashboard, Package, ClipboardCheck, Wallet, User, Clock, Briefcase, BarChart2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { useAuth } from '../context/AuthContext';
 
 interface SidebarProps {
   currentView: string;
-  setCurrentView: (view: string) => void;
+  setCurrentView: (view: any) => void;
 }
 
 export function Sidebar({ currentView, setCurrentView }: SidebarProps) {
@@ -17,6 +17,8 @@ export function Sidebar({ currentView, setCurrentView }: SidebarProps) {
     { id: 'production', label: 'Production & QC', icon: ClipboardCheck, roles: ['owner', 'manager', 'foreman', 'worker'] },
     { id: 'dtr', label: 'DTR & Attendance', icon: Clock, roles: ['owner', 'manager', 'finance', 'foreman', 'worker'] },
     { id: 'payroll', label: 'Payroll & Payslips', icon: Wallet, roles: ['owner', 'manager', 'finance', 'foreman', 'worker'] },
+    { id: 'sales',      label: 'Sales & CRM',         icon: Briefcase,  roles: ['owner', 'finance'] },
+    { id: 'analytics',  label: 'Analytics & Reports',  icon: BarChart2,  roles: ['owner', 'finance'] },
   ];
 
   const menuItems = allMenuItems.filter(item => item.roles.includes(userRole));

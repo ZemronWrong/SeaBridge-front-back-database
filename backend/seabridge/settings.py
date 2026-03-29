@@ -29,6 +29,9 @@ INSTALLED_APPS = [
     'production',
     'payroll',
     'dtr',
+    'sales',
+    'reports',
+    'notifications',
 ]
 
 MIDDLEWARE = [

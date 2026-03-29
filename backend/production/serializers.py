@@ -3,9 +3,11 @@ from .models import Project, Task, QualityCheck
 
 
 class ProjectSerializer(serializers.ModelSerializer):
+    customer_name = serializers.CharField(source='customer.name', read_only=True)
+
     class Meta:
         model = Project
-        fields = ['id', 'project_id', 'name', 'progress', 'status', 'deadline']
+        fields = ['id', 'project_id', 'name', 'customer', 'customer_name', 'progress', 'status', 'deadline']
         read_only_fields = ['id']
 
 

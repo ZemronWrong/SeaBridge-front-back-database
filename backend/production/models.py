@@ -9,6 +9,7 @@ class Project(models.Model):
     """
     project_id = models.CharField(max_length=20, unique=True, verbose_name='Project ID')
     name = models.CharField(max_length=200)
+    customer = models.ForeignKey('sales.Customer', on_delete=models.SET_NULL, null=True, blank=True, related_name='projects')
     progress = models.IntegerField(default=0, help_text='Progress percentage 0-100')
     status = models.CharField(max_length=30, default='Started')
     deadline = models.DateField()
