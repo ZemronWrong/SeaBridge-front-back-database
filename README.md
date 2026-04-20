@@ -77,7 +77,12 @@ python -m venv venv
 # Install Python dependencies
 pip install -r requirements.txt
 
-# Run database migrations
+# (Optional) If starting completely from scratch, delete the existing SQLite database
+# Remove-Item -Force db.sqlite3  # Windows
+# rm db.sqlite3                  # macOS / Linux
+
+# Run database migrations to create the tables
+python manage.py makemigrations
 python manage.py migrate
 
 # Seed the database with demo users and test data
@@ -207,11 +212,13 @@ SeaBridge-front-back-database/
 │   ├── seed_data.py            # Database seeding script
 │   ├── manage.py
 │   └── requirements.txt
-├── src/                        # React frontend
-│   ├── components/             # UI modules (Dashboard, Inventory, etc.)
-│   ├── context/                # AuthContext (authentication state)
-│   ├── api.ts                  # API fetch helper
-│   ├── App.tsx                 # Main app with login & routing
+├── src/                        # React frontend (TypeScript)
+│   ├── api/                    # API client services (handles external HTTP calls)
+│   ├── components/             # Pure UI View modules (Dashboard, Inventory, etc.)
+│   ├── context/                # AuthContext (global authentication state)
+│   ├── hooks/                  # Logic orchestrators (useInventory, useSales, etc.)
+│   ├── types/                  # Global frontend TypeScript Interfaces
+│   ├── App.tsx                 # Main app with login & client routing
 │   └── main.tsx                # Vite entry point
 ├── public/
 │   └── login-bg.png            # Login page background image
