@@ -7,14 +7,10 @@ from .serializers import NotificationSerializer
 
 
 class NotificationListView(generics.ListAPIView):
-    """
-    List unread notifications for the current user.
-    """
     serializer_class = NotificationSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        # Optional: query parameter to show all vs unread
         unread_only = self.request.query_params.get('unread_only', 'true').lower() == 'true'
         qs = Notification.objects.filter(user=self.request.user)
         if unread_only:
@@ -23,9 +19,6 @@ class NotificationListView(generics.ListAPIView):
 
 
 class NotificationMarkReadView(APIView):
-    """
-    Mark a specific notification as read.
-    """
     permission_classes = [IsAuthenticated]
 
     def patch(self, request, pk):
@@ -39,9 +32,6 @@ class NotificationMarkReadView(APIView):
 
 
 class NotificationMarkAllReadView(APIView):
-    """
-    Mark all notifications for the user as read.
-    """
     permission_classes = [IsAuthenticated]
 
     def post(self, request):

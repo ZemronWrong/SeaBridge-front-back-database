@@ -6,7 +6,7 @@ import {
 } from 'recharts';
 import { TrendingUp, Factory, Package, Receipt, AlertTriangle, BarChart2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { apiFetch } from '../api';
+import { useAnalytics } from '../hooks/useAnalytics';
 
 interface ExpenditureRow { month: string; total: number; }
 interface ProductionRow  { name: string; label: string; progress: number; status: string; overdue: boolean; }
@@ -29,15 +29,7 @@ const INVOICE_COLORS: Record<string, string> = {
 };
 
 export function AnalyticsModule() {
-  const [data, setData] = useState<AnalyticsData | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    apiFetch('/analytics/dashboard/')
-      .then((d: AnalyticsData) => setData(d))
-      .catch((e: any) => toast.error('Failed to load analytics: ' + e.message))
-      .finally(() => setLoading(false));
-  }, []);
+  const { data, loading } = useAnalytics();
 
   if (loading) {
     return (

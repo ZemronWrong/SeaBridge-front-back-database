@@ -8,7 +8,7 @@ import { Input } from './ui/input';
 import { Calendar, Clock, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
-import { apiFetch } from '../api';
+import { useDTR } from '../hooks/useDTR';
 
 type DTRStatus = 'Present' | 'Absent' | 'On Leave';
 
@@ -24,35 +24,19 @@ interface DTRRecord {
   break_minutes: number;
   overtime_hours: string | number;
   status: DTRStatus;
+  auto_clocked_out?: boolean;
+  requires_adjustment?: boolean;
 }
 
 export function DTRModule() {
   const { user } = useAuth();
-  const [records, setRecords] = useState<DTRRecord[]>([]);
+  const { records, loading, handleClockIn, handleClockOut, handleApproveAdjustment } = useDTR();
   const [periodFilter, setPeriodFilter] = useState<'today' | 'week' | 'month' | 'all'>('today');
   const [dateFilter, setDateFilter] = useState('');
-  const [loading, setLoading] = useState(true);
 
-  // Use local date for "today"
-  const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD format
-
+  const today = new Date().toLocaleDateString('en-CA');
   const isEmployee = user?.role === 'worker' || user?.role === 'foreman';
-
-  const fetchDTR = async () => {
-    try {
-      setLoading(true);
-      const data = await apiFetch('/dtr/');
-      setRecords(data);
-    } catch (e: any) {
-      toast.error('Failed to load DTR: ' + e.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchDTR();
-  }, []);
+  const canApprove = user?.role === 'owner' || user?.role === 'manager';
 
   // Filter records based on selected period logic (frontend)
   const filteredByPeriod = records.filter((r) => {
@@ -73,36 +57,6 @@ export function DTRModule() {
     }
     return true; // all
   });
-
-  const handleClockIn = async () => {
-    try {
-      const resp = await apiFetch('/dtr/clock-in/', {
-        method: 'POST',
-        body: JSON.stringify({ time_in: new Date().toLocaleTimeString([], { hour12: false }) })
-      });
-      setRecords((prev) => [...prev, resp]);
-      toast.success('Clocked in successfully');
-    } catch(e: any) {
-      toast.error('Clock-in failed: ' + e.message);
-    }
-  };
-
-  const handleClockOut = async () => {
-    try {
-      const resp = await apiFetch('/dtr/clock-out/', {
-        method: 'POST',
-        body: JSON.stringify({ 
-           time_out: new Date().toLocaleTimeString([], { hour12: false }),
-           break_minutes: 60, // Default break
-           overtime_hours: 0  // Default overtime (needs manual adjustment normally)
-        })
-      });
-      setRecords((prev) => prev.map(r => r.id === resp.id ? resp : r));
-      toast.success('Clocked out successfully');
-    } catch(e: any) {
-      toast.error('Clock-out failed: ' + e.message);
-    }
-  };
 
   const exportToCsv = () => {
     const header = [
@@ -233,6 +187,7 @@ export function DTRModule() {
                 <TableHead>Break (mins)</TableHead>
                 <TableHead>Overtime (hrs)</TableHead>
                 <TableHead>Status</TableHead>
+                {canApprove && <TableHead>Action</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -253,18 +208,35 @@ export function DTRModule() {
                     <TableCell>{rec.break_minutes}</TableCell>
                     <TableCell>{rec.overtime_hours}</TableCell>
                     <TableCell>
-                      <Badge
-                        variant={
-                          rec.status === 'Present'
-                            ? 'default'
-                            : rec.status === 'On Leave'
-                            ? 'secondary'
-                            : 'destructive'
-                        }
-                      >
-                        {rec.status}
-                      </Badge>
+                      <div className="flex gap-1 items-center">
+                        <Badge
+                          variant={
+                            rec.status === 'Present'
+                              ? 'default'
+                              : rec.status === 'On Leave'
+                              ? 'secondary'
+                              : 'destructive'
+                          }
+                        >
+                          {rec.status}
+                        </Badge>
+                        {rec.auto_clocked_out && (
+                          <Badge className="bg-amber-500 text-xs">Auto</Badge>
+                        )}
+                        {rec.requires_adjustment && (
+                          <Badge variant="destructive" className="text-xs">Needs Review</Badge>
+                        )}
+                      </div>
                     </TableCell>
+                    {canApprove && (
+                      <TableCell>
+                        {rec.requires_adjustment ? (
+                          <Button size="sm" variant="outline" onClick={() => handleApproveAdjustment(rec.id)}>
+                            Approve
+                          </Button>
+                        ) : null}
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))
               ) : (

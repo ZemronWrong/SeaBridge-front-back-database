@@ -7,7 +7,10 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Project
-        fields = ['id', 'project_id', 'name', 'customer', 'customer_name', 'progress', 'status', 'deadline']
+        fields = [
+            'id', 'project_id', 'name', 'customer', 'customer_name',
+            'progress', 'status', 'deadline', 'payment_status',
+        ]
         read_only_fields = ['id']
 
 
@@ -21,8 +24,9 @@ class TaskSerializer(serializers.ModelSerializer):
             'id', 'task_id', 'project', 'project_id_display', 'project_name',
             'task_name', 'assigned_to', 'assigned_by', 'status',
             'deadline', 'created_date', 'description',
+            'deadline_flag', 'missed_deadline_count',
         ]
-        read_only_fields = ['id', 'task_id', 'created_date']
+        read_only_fields = ['id', 'task_id', 'created_date', 'deadline_flag', 'missed_deadline_count']
 
 
 class TaskStatusUpdateSerializer(serializers.Serializer):

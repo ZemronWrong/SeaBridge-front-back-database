@@ -4,7 +4,7 @@ import { Package, Users, ClipboardCheck, DollarSign, AlertTriangle, TrendingUp, 
 import { Progress } from './ui/progress';
 import { Badge } from './ui/badge';
 import { useAuth } from '../context/AuthContext';
-import { apiFetch } from '../api';
+import { useDashboard } from '../hooks/useDashboard';
 
 interface DashboardMetrics {
   totalMaterials: number;
@@ -20,58 +20,7 @@ export function Dashboard() {
   const { user } = useAuth();
   const userRole = user?.role ?? 'worker';
   
-  const [loading, setLoading] = useState(true);
-  const [metrics, setMetrics] = useState<DashboardMetrics>({
-    totalMaterials: 0,
-    activeProjects: 0,
-    activeWorkers: 0,
-    monthlyPayroll: 0,
-    lowStockItems: [],
-    projects: [],
-    qualityChecks: []
-  });
-
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
-
-  const fetchDashboardData = async () => {
-    try {
-      setLoading(true);
-      const [materials, projects, payroll, dtr, qc] = await Promise.all([
-        apiFetch('/materials/'),
-        apiFetch('/projects/'),
-        apiFetch('/payroll/'),
-        apiFetch('/dtr/'),
-        apiFetch('/quality-checks/').catch(() => []) // Handle potential 403
-      ]);
-
-      const lowStock = materials.filter((m: any) => (m.quantity || 0) <= (m.min_stock || 0));
-      const activeProjs = projects.filter((p: any) => p.status !== 'Completed');
-      const today = new Date().toLocaleDateString('en-CA');
-      const activeWrks = dtr.filter((d: any) => d.date === today && d.status === 'Present').length;
-      
-      // Calculate current month's payroll sum
-      const currentMonth = new Date().toISOString().substring(0, 7);
-      const monthlyPay = payroll
-        .filter((r: any) => r.period === currentMonth)
-        .reduce((sum: number, r: any) => sum + Number(r.net_pay || 0), 0);
-
-      setMetrics({
-        totalMaterials: materials.length,
-        activeProjects: activeProjs.length,
-        activeWorkers: activeWrks || 24, // Fallback for UI demo if no DTR yet
-        monthlyPayroll: monthlyPay,
-        lowStockItems: lowStock.slice(0, 5), // Only show top 5 alerts
-        projects: projects.slice(0, 4),
-        qualityChecks: qc.slice(0, 4)
-      });
-    } catch (e: any) {
-      console.error('Failed to fetch dashboard data:', e);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { metrics, loading } = useDashboard();
 
   const stats = [
     { 

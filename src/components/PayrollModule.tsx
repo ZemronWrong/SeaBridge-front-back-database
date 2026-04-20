@@ -11,6 +11,7 @@ import { Plus, DollarSign, Calendar, FileText, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../api';
+import { usePayroll } from '../hooks/usePayroll';
 
 interface PayrollModuleProps {}
 
@@ -45,11 +46,9 @@ interface PayrollRecord {
 export function PayrollModule({}: PayrollModuleProps) {
   const { user } = useAuth();
   const userRole = user?.role ?? 'worker';
+  const { employees, records: payrollRecords, createPayroll, updateStatus } = usePayroll();
   const [isPayrollDialogOpen, setIsPayrollDialogOpen] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState('all');
-
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [payrollRecords, setPayrollRecords] = useState<PayrollRecord[]>([]);
 
   const [newPayroll, setNewPayroll] = useState({
     employeeId: '',
@@ -57,56 +56,15 @@ export function PayrollModule({}: PayrollModuleProps) {
     days_worked: 0
   });
 
-  useEffect(() => {
-    fetchData();
-  }, [userRole]);
-
-  const fetchData = async () => {
-    try {
-      const pData = await apiFetch('/payroll/');
-      setPayrollRecords(pData);
-      
-      if (['owner', 'manager', 'finance'].includes(userRole)) {
-        const eData = await apiFetch('/employees/');
-        setEmployees(eData);
-      }
-    } catch(e: any) {
-      toast.error('Failed to load payroll data: ' + e.message);
-    }
-  };
-
   const handleCreatePayroll = async () => {
-    if (!newPayroll.employeeId) {
-      toast.error('Please select an employee.');
-      return;
-    }
-    if (!newPayroll.period) {
-      toast.error('Please enter a pay period.');
-      return;
-    }
-    if (newPayroll.days_worked <= 0) {
-      toast.error('Days worked must be greater than 0.');
-      return;
-    }
-
-    try {
-      const payload = {
-        employee_id: newPayroll.employeeId,
-        period: newPayroll.period,
-        days_worked: newPayroll.days_worked
-      };
-      
-      const savedRecord = await apiFetch('/payroll/', {
-        method: 'POST',
-        body: JSON.stringify(payload)
-      });
-      
-      setPayrollRecords([...payrollRecords, savedRecord]);
+    const payload = {
+      employee_id: newPayroll.employeeId,
+      period: newPayroll.period,
+      days_worked: newPayroll.days_worked
+    };
+    if (await createPayroll(payload)) {
       setIsPayrollDialogOpen(false);
       setNewPayroll({ employeeId: '', period: '', days_worked: 0 });
-      toast.success('Payroll record created');
-    } catch (e: any) {
-      toast.error('Failed to create payroll: ' + e.message);
     }
   };
 
@@ -549,20 +507,7 @@ export function PayrollModule({}: PayrollModuleProps) {
                       {record.status !== 'Paid' && (
                         <Select
                           value={record.status}
-                          onValueChange={async (v: string) => {
-                            try {
-                              await apiFetch(`/payroll/${record.id}/update-status/`, {
-                                method: 'POST',
-                                body: JSON.stringify({ status: v })
-                              });
-                              setPayrollRecords(payrollRecords.map(r => 
-                                r.id === record.id ? {...r, status: v as PayrollRecord['status']} : r
-                              ));
-                              toast.success('Payroll status updated');
-                            } catch(e: any) {
-                              toast.error('Failed to update: ' + e.message);
-                            }
-                          }}
+                          onValueChange={(v: string) => updateStatus(record.id, v)}
                         >
                           <SelectTrigger className="w-32">
                             <SelectValue />

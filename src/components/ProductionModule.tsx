@@ -11,7 +11,7 @@ import { Badge } from './ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Plus, ClipboardCheck, Users, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
-import { apiFetch } from '../api';
+import { useProduction } from '../hooks/useProduction';
 
 interface ProductionModuleProps {
   userRole: string;
@@ -35,6 +35,8 @@ interface Task {
   deadline: string;
   created_date: string;
   description: string;
+  deadline_flag?: string;
+  missed_deadline_count?: number;
 }
 
 interface QualityCheck {
@@ -50,12 +52,12 @@ interface QualityCheck {
 }
 
 export function ProductionModule({ userRole }: ProductionModuleProps) {
+  const { tasks, projects, qualityChecks, loading, createTask, createQC, updateTaskStatus } = useProduction();
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [isQCDialogOpen, setIsQCDialogOpen] = useState(false);
 
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [qualityChecks, setQualityChecks] = useState<QualityCheck[]>([]);
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [searchFilter, setSearchFilter] = useState('');
 
   const [newTask, setNewTask] = useState({
     project: '', 
@@ -74,65 +76,30 @@ export function ProductionModule({ userRole }: ProductionModuleProps) {
 
   const workers = ['Juan dela Cruz', 'Pedro Santos', 'Maria Garcia', 'Jose Reyes', 'Roberto Cruz', 'Ana Lopez', 'Carlos Mendoza'];
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
-    try {
-      const [projData, taskData, qcData] = await Promise.all([
-        apiFetch('/projects/'),
-        apiFetch('/tasks/'),
-        apiFetch('/quality-checks/').catch(() => []) // Workers might get 403 or empty, we handle it
-      ]);
-      setProjects(projData);
-      setTasks(taskData);
-      setQualityChecks(qcData);
-    } catch (e: any) {
-      toast.error('Failed to load production data: ' + e.message);
-    }
-  };
-
   const handleAddTask = async () => {
-    try {
-      const payload = {
-        project: Number(newTask.project),
-        task_name: newTask.task_name,
-        assigned_to: newTask.assigned_to,
-        deadline: newTask.deadline,
-        description: newTask.description
-      };
-      const savedTask = await apiFetch('/tasks/', {
-        method: 'POST',
-        body: JSON.stringify(payload)
-      });
-      setTasks([...tasks, savedTask]);
+    const payload = {
+      project: Number(newTask.project),
+      task_name: newTask.task_name,
+      assigned_to: newTask.assigned_to,
+      deadline: newTask.deadline,
+      description: newTask.description
+    };
+    if (await createTask(payload)) {
       setIsTaskDialogOpen(false);
       setNewTask({ project: '', task_name: '', assigned_to: '', deadline: '', description: '' });
-      toast.success('Task assigned successfully');
-    } catch(e: any) {
-      toast.error('Failed to assign task: ' + e.message);
     }
   };
 
   const handleAddQC = async () => {
-    try {
-      const payload = {
-        project: Number(newQC.project),
-        inspection_item: newQC.inspection_item,
-        result: newQC.result,
-        notes: newQC.notes
-      };
-      const savedQC = await apiFetch('/quality-checks/', {
-        method: 'POST',
-        body: JSON.stringify(payload)
-      });
-      setQualityChecks([...qualityChecks, savedQC]);
+    const payload = {
+      project: Number(newQC.project),
+      inspection_item: newQC.inspection_item,
+      result: newQC.result,
+      notes: newQC.notes
+    };
+    if (await createQC(payload)) {
       setIsQCDialogOpen(false);
       setNewQC({ project: '', inspection_item: '', result: 'Pass', notes: '' });
-      toast.success('Quality check recorded');
-    } catch (e: any) {
-      toast.error('Failed to save quality check: ' + e.message);
     }
   };
 
@@ -149,8 +116,15 @@ export function ProductionModule({ userRole }: ProductionModuleProps) {
     ? Math.round((qualityChecks.filter((q: QualityCheck) => q.result === 'Pass').length / qualityChecks.length) * 100)
     : 0;
 
-  // With API, tasks are already filtered for workers!
-  const visibleTasks = tasks;
+  const visibleTasks = tasks.filter(t => {
+    const matchesStatus = statusFilter === 'all' || t.status === statusFilter ||
+      (statusFilter === 'Overdue' && new Date(t.deadline) < new Date() && t.status !== 'Completed');
+    const matchesSearch = !searchFilter ||
+      t.task_name.toLowerCase().includes(searchFilter.toLowerCase()) ||
+      t.assigned_to.toLowerCase().includes(searchFilter.toLowerCase()) ||
+      t.project_name?.toLowerCase().includes(searchFilter.toLowerCase());
+    return matchesStatus && matchesSearch;
+  });
 
   return (
     <div className="space-y-6">
@@ -222,7 +196,7 @@ export function ProductionModule({ userRole }: ProductionModuleProps) {
                       <Label>Project</Label>
                       <Select 
                         value={newTask.project}
-                        onValueChange={(v) => setNewTask({...newTask, project: v})}
+                        onValueChange={(v: string) => setNewTask({...newTask, project: v})}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select project" />
@@ -246,7 +220,7 @@ export function ProductionModule({ userRole }: ProductionModuleProps) {
                       <Label>Assign To</Label>
                       <Select 
                         value={newTask.assigned_to}
-                        onValueChange={(v) => setNewTask({...newTask, assigned_to: v})}
+                        onValueChange={(v: string) => setNewTask({...newTask, assigned_to: v})}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select worker" />
@@ -286,6 +260,31 @@ export function ProductionModule({ userRole }: ProductionModuleProps) {
           </div>
 
           <Card>
+            <CardContent className="p-4">
+              <div className="flex gap-3 flex-wrap">
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-40">
+                    <SelectValue placeholder="Filter Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="Pending">Pending</SelectItem>
+                    <SelectItem value="In Progress">In Progress</SelectItem>
+                    <SelectItem value="Completed">Completed</SelectItem>
+                    <SelectItem value="Overdue">Overdue</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Input
+                  placeholder="Search task, worker, or project..."
+                  value={searchFilter}
+                  onChange={(e) => setSearchFilter(e.target.value)}
+                  className="max-w-xs"
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
             <CardHeader>
               <CardTitle>{isWorker ? 'My Assigned Tasks' : 'Assigned Tasks'}</CardTitle>
             </CardHeader>
@@ -321,26 +320,26 @@ export function ProductionModule({ userRole }: ProductionModuleProps) {
                           {task.status}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-sm">{task.deadline}</TableCell>
+                      <TableCell>
+                        <div className="flex gap-1 items-center">
+                          <span className="text-sm">{task.deadline}</span>
+                          {task.deadline_flag && task.deadline_flag !== 'On Track' && (
+                            <Badge className={
+                              task.deadline_flag === 'Warning' ? 'bg-amber-500 text-xs' :
+                              task.deadline_flag === 'Review' ? 'bg-orange-600 text-xs' :
+                              task.deadline_flag === 'Disciplinary' ? 'bg-red-700 text-xs' : ''
+                            }>
+                              {task.deadline_flag}
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
                       {!isWorker && <TableCell className="text-sm">{task.assigned_by}</TableCell>}
                       <TableCell>
                         {task.status !== 'Completed' && (isWorker || canAssignTasks || canPerformQC) && (
                           <Select
                             value={task.status}
-                            onValueChange={async (v) => {
-                              try {
-                                await apiFetch(`/tasks/${task.id}/update-status/`, {
-                                  method: 'POST',
-                                  body: JSON.stringify({ status: v })
-                                });
-                                setTasks(tasks.map(t => 
-                                  t.id === task.id ? {...t, status: v as Task['status']} : t
-                                ));
-                                toast.success('Task status updated');
-                              } catch(e: any) {
-                                toast.error('Failed to update: ' + e.message);
-                              }
-                            }}
+                            onValueChange={(v: string) => updateTaskStatus(task.id, v as any)}
                           >
                             <SelectTrigger className="w-32">
                               <SelectValue />
@@ -381,7 +380,7 @@ export function ProductionModule({ userRole }: ProductionModuleProps) {
                       <Label>Project</Label>
                       <Select 
                         value={newQC.project}
-                        onValueChange={(v) => setNewQC({...newQC, project: v})}
+                        onValueChange={(v: string) => setNewQC({...newQC, project: v})}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select project" />

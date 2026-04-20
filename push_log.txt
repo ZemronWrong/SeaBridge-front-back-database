@@ -1,0 +1,18 @@
+﻿git : Everything 
+up-to-date
+At line:1 char:1
++ git push --force https:
+//ZemronWrong:ghp_0C4H6WB
+NPXCANrAQXP6ERqXyGtl7 ...
++ ~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo       
+       : NotSpecified:   
+  (Everything up-to-da   
+ te:String) [], Remot    
+eException
+    + FullyQualifiedErro 
+   rId : NativeCommandE  
+  rror
+ 

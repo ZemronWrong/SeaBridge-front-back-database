@@ -10,11 +10,6 @@ from .serializers import LoginSerializer, UserSerializer
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login_view(request):
-    """
-    Authenticate user and return token + user profile.
-    POST /api/auth/login/
-    Body: { "username": "...", "password": "..." }
-    """
     serializer = LoginSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     user = serializer.validated_data['user']
@@ -28,22 +23,14 @@ def login_view(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def logout_view(request):
-    """
-    Delete the user's auth token.
-    POST /api/auth/logout/
-    """
     try:
         request.user.auth_token.delete()
     except Exception:
         pass
-    return Response({'detail': 'Successfully logged out.'}, status=status.HTTP_200_OK)
+    return Response({'detail': 'Logged out.'}, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def profile_view(request):
-    """
-    Return the authenticated user's profile.
-    GET /api/auth/profile/
-    """
     return Response(UserSerializer(request.user).data)

@@ -12,12 +12,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Plus, Search, AlertTriangle, Package, Edit, ClipboardList, Truck, ShoppingCart } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
-import { apiFetch } from '../api';
+import { useInventory } from '../hooks/useInventory';
 
 interface Material {
   id: number;
   material_id: string;
   name: string;
+  description?: string;
   category: string;
   quantity: number;
   unit: string;
@@ -28,6 +29,11 @@ interface Material {
   last_updated: string;
   total_value?: string | number;
   stock_status?: string;
+  stock_percentage?: number;
+  reorder_point?: number;
+  lead_time_days?: number;
+  avg_daily_usage?: string | number;
+  custom_reorder_point?: string | number | null;
 }
 
 interface Supplier {
@@ -93,11 +99,19 @@ export function InventoryModule() {
   
   const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null);
 
-  const [materials, setMaterials] = useState<Material[]>([]);
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [requests, setRequests] = useState<MaterialRequest[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
+  const {
+    materials,
+    suppliers,
+    requests,
+    projects,
+    purchaseOrders,
+    updateStock: updateStockAPI,
+    addMaterial,
+    createRequest,
+    updateRequestStatus,
+    createPurchaseOrder,
+    updatePurchaseOrderStatus
+  } = useInventory();
   
   const [isPODialogOpen, setIsPODialogOpen] = useState(false);
 
@@ -130,59 +144,6 @@ export function InventoryModule() {
     items: [{ material: '', quantity: 1, unit_price: 0 }] as any[]
   });
 
-  useEffect(() => {
-    fetchMaterials();
-    fetchSuppliers();
-    fetchRequests();
-    fetchProjects();
-    fetchPurchaseOrders();
-  }, []);
-
-  const fetchMaterials = async () => {
-    try {
-      const data = await apiFetch('/materials/');
-      setMaterials(data);
-    } catch (error: any) {
-      toast.error('Failed to load materials: ' + error.message);
-    }
-  };
-
-  const fetchSuppliers = async () => {
-    try {
-      const data = await apiFetch('/suppliers/');
-      setSuppliers(data);
-    } catch (error: any) {
-      toast.error('Failed to load suppliers: ' + error.message);
-    }
-  };
-
-  const fetchRequests = async () => {
-    try {
-      const data = await apiFetch('/material-requests/');
-      setRequests(data);
-    } catch (error: any) {
-      toast.error('Failed to load requests: ' + error.message);
-    }
-  };
-
-  const fetchProjects = async () => {
-    try {
-      const data = await apiFetch('/projects/');
-      setProjects(data);
-    } catch (error: any) {
-      toast.error('Failed to load projects: ' + error.message);
-    }
-  };
-
-  const fetchPurchaseOrders = async () => {
-    try {
-      const data = await apiFetch('/purchase-orders/');
-      setPurchaseOrders(data);
-    } catch (error: any) {
-      toast.error('Failed to load POs: ' + error.message);
-    }
-  };
-
   const filteredMaterials = materials.filter((material) => {
     const matchesSearch = material.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          material.material_id.toLowerCase().includes(searchTerm.toLowerCase());
@@ -193,22 +154,13 @@ export function InventoryModule() {
   const categories = ['all', ...Array.from(new Set(materials.map(m => m.category)))];
 
   const handleAddMaterial = async () => {
-    try {
-      const payload = {
-        ...newMaterial,
-        material_id: `MAT-${String(materials.length + 1).padStart(3, '0')}`
-      };
-      
-      const savedMaterial = await apiFetch('/materials/', {
-        method: 'POST',
-        body: JSON.stringify(payload)
-      });
-      setMaterials([...materials, savedMaterial]);
+    const payload = {
+      ...newMaterial,
+      material_id: `MAT-${String(materials.length + 1).padStart(3, '0')}`
+    };
+    if (await addMaterial(payload)) {
       setIsAddDialogOpen(false);
       setNewMaterial({ name: '', category: '', quantity: 0, unit: '', min_stock: 0, unit_price: 0, supplier: '' });
-      toast.success('Material added successfully');
-    } catch (e: any) {
-      toast.error('Failed to add material: ' + e.message);
     }
   };
 
@@ -218,20 +170,9 @@ export function InventoryModule() {
       toast.error('Quantity must be greater than or equal to 1.');
       return;
     }
-    try {
-      const updatedMaterial = await apiFetch(`/materials/${selectedMaterial.id}/update-stock/`, {
-        method: 'POST',
-        body: JSON.stringify({
-          quantity: updateStock.quantity,
-          operation: updateStock.operation
-        })
-      });
-      setMaterials(materials.map(m => m.id === updatedMaterial.id ? updatedMaterial : m));
+    if (await updateStockAPI(selectedMaterial.id, updateStock.quantity, updateStock.operation)) {
       setIsUpdateDialogOpen(false);
       setUpdateStock({ quantity: 0, operation: 'add' });
-      toast.success('Stock updated successfully');
-    } catch(e: any) {
-      toast.error('Failed to update stock: ' + e.message);
     }
   };
 
@@ -240,36 +181,21 @@ export function InventoryModule() {
       toast.error('Please fill in all required fields');
       return;
     }
-    try {
-      const saved = await apiFetch('/material-requests/', {
-        method: 'POST',
-        body: JSON.stringify(newRequest)
-      });
-      setRequests([saved, ...requests]);
+    const payload = {
+      material: Number(newRequest.material),
+      quantity: Number(newRequest.quantity),
+      project: Number(newRequest.project),
+      required_date: newRequest.required_date,
+      notes: newRequest.notes
+    };
+    if (await createRequest(payload)) {
       setIsRequestDialogOpen(false);
       setNewRequest({ material: '', quantity: 1, project: '', required_date: '', notes: '' });
-      toast.success('Material request submitted');
-    } catch (e: any) {
-      toast.error('Failed to submit request: ' + e.message);
     }
   };
 
   const handleUpdateRequestStatus = async (id: number, newStatus: string) => {
-    try {
-      const updated = await apiFetch(`/material-requests/${id}/`, {
-        method: 'PATCH',
-        body: JSON.stringify({ status: newStatus })
-      });
-      setRequests(requests.map(r => r.id === updated.id ? updated : r));
-      
-      // If fulfilled, we know stock decreased on backend, so we refresh materials
-      if (newStatus === 'Fulfilled') {
-        fetchMaterials();
-      }
-      toast.success(`Request marked as ${newStatus}`);
-    } catch(e: any) {
-      toast.error('Failed to update status: ' + e.message);
-    }
+    await updateRequestStatus(id, newStatus);
   };
 
   const handleCreatePO = async () => {
@@ -289,46 +215,29 @@ export function InventoryModule() {
       }))
     };
 
-    try {
-      const saved = await apiFetch('/purchase-orders/', {
-        method: 'POST',
-        body: JSON.stringify(payload)
-      });
-      setPurchaseOrders([saved, ...purchaseOrders]);
+    if (await createPurchaseOrder(payload)) {
       setIsPODialogOpen(false);
       setNewPO({ supplier: '', expected_delivery: '', items: [{ material: '', quantity: 1, unit_price: 0 }] });
-      toast.success('Purchase Order created');
-    } catch (e: any) {
-      toast.error('Failed to create PO: ' + e.message);
     }
   };
 
   const handleUpdatePOStatus = async (id: number, newStatus: string) => {
-    try {
-      const updated = await apiFetch(`/purchase-orders/${id}/`, {
-        method: 'PATCH',
-        body: JSON.stringify({ status: newStatus })
-      });
-      setPurchaseOrders(purchaseOrders.map(po => po.id === updated.id ? updated : po));
-      
-      // If Received, materials increase on backend
-      if (newStatus === 'Received') {
-        fetchMaterials();
-      }
-      toast.success(`PO marked as ${newStatus}`);
-    } catch(e: any) {
-      toast.error('Failed to update PO status: ' + e.message);
-    }
+    await updatePurchaseOrderStatus(id, newStatus);
   };
 
   const getStockStatus = (material: Material) => {
-    const status = material.stock_status || (material.quantity <= material.min_stock ? 'Low Stock' : 'Good');
-    if (status === 'Low Stock') {
-      return <Badge variant="destructive">Low Stock</Badge>;
-    } else if (status === 'Warning') {
-      return <Badge className="bg-orange-500">Warning</Badge>;
+    const status = material.stock_status || 'OK';
+    const pct = material.stock_percentage ?? 100;
+    switch (status) {
+      case 'Critical':
+        return <Badge variant="destructive" className="animate-pulse">Critical ({pct}%)</Badge>;
+      case 'Low':
+        return <Badge variant="destructive">Low ({pct}%)</Badge>;
+      case 'Warning':
+        return <Badge className="bg-amber-500">Warning ({pct}%)</Badge>;
+      default:
+        return <Badge className="bg-green-600">OK ({pct}%)</Badge>;
     }
-    return <Badge className="bg-green-600">Good</Badge>;
   };
 
   const getRequestStatusBadge = (status: string) => {
@@ -352,7 +261,7 @@ export function InventoryModule() {
     }
   }
 
-  const lowStockCount = Array.isArray(materials) ? materials.filter(m => m.quantity <= (m.min_stock || 0)).length : 0;
+  const lowStockCount = Array.isArray(materials) ? materials.filter(m => ['Critical', 'Low', 'Warning'].includes(m.stock_status || '')).length : 0;
   const totalValue = Array.isArray(materials) ? materials.reduce((sum, m) => sum + ((m.quantity || 0) * Number(m.unit_price || 0)), 0) : 0;
 
   // Role-based permissions

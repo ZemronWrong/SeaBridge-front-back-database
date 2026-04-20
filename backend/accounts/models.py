@@ -3,10 +3,6 @@ from django.db import models
 
 
 class CustomUser(AbstractUser):
-    """
-    Custom user model with role-based access.
-    Mirrors the frontend's UserRole type: owner | manager | finance | foreman | worker
-    """
 
     class Role(models.TextChoices):
         OWNER = 'owner', 'Owner'
@@ -15,12 +11,7 @@ class CustomUser(AbstractUser):
         FOREMAN = 'foreman', 'Foreman'
         WORKER = 'worker', 'Worker'
 
-    role = models.CharField(
-        max_length=10,
-        choices=Role.choices,
-        default=Role.WORKER,
-    )
-    # Optional link to the Employee record (for workers/foremen)
+    role = models.CharField(max_length=10, choices=Role.choices, default=Role.WORKER)
     employee_id = models.CharField(max_length=20, blank=True, default='')
     team_id = models.CharField(max_length=20, blank=True, default='')
 

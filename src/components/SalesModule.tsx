@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Plus, Users, FileText, Search, CreditCard, Ship, Building2, Briefcase } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
-import { apiFetch } from '../api';
+import { useSales } from '../hooks/useSales';
 
 interface Customer {
   id: number;
@@ -50,9 +50,14 @@ interface Invoice {
 export function SalesModule() {
   const { user } = useAuth();
   
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
+  const { 
+    customers, 
+    invoices, 
+    projects, 
+    createCustomer, 
+    createInvoice, 
+    updateInvoiceStatus 
+  } = useSales();
   
   const [isCustomerDialogOpen, setIsCustomerDialogOpen] = useState(false);
   const [isInvoiceDialogOpen, setIsInvoiceDialogOpen] = useState(false);
@@ -68,41 +73,14 @@ export function SalesModule() {
 
   const [searchTerm, setSearchTerm] = useState('');
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
-    try {
-      const [custRes, invRes, projRes] = await Promise.all([
-        apiFetch('/customers/'),
-        apiFetch('/invoices/'),
-        apiFetch('/projects/')
-      ]);
-      setCustomers(custRes);
-      setInvoices(invRes);
-      setProjects(projRes);
-    } catch (e: any) {
-      toast.error('Failed to load CRM data: ' + e.message);
-    }
-  };
-
   const handleCreateCustomer = async () => {
     if (!newCustomer.name) {
       toast.error("Name is required");
       return;
     }
-    try {
-      const saved = await apiFetch('/customers/', {
-        method: 'POST',
-        body: JSON.stringify(newCustomer)
-      });
-      setCustomers([saved, ...customers]);
+    if (await createCustomer(newCustomer)) {
       setIsCustomerDialogOpen(false);
       setNewCustomer({ name: '', company: '', email: '', phone: '', address: '', preferences: '' });
-      toast.success('Customer created successfully');
-    } catch (e: any) {
-      toast.error('Failed to create customer: ' + e.message);
     }
   };
 
@@ -111,36 +89,19 @@ export function SalesModule() {
       toast.error("Please fill all required fields");
       return;
     }
-    try {
-      const payload = {
-        ...newInvoice,
-        customer: Number(newInvoice.customer),
-        project: newInvoice.project ? Number(newInvoice.project) : null,
-      };
-      const saved = await apiFetch('/invoices/', {
-        method: 'POST',
-        body: JSON.stringify(payload)
-      });
-      setInvoices([saved, ...invoices]);
+    const payload = {
+      ...newInvoice,
+      customer: Number(newInvoice.customer),
+      project: newInvoice.project ? Number(newInvoice.project) : null,
+    };
+    if (await createInvoice(payload)) {
       setIsInvoiceDialogOpen(false);
       setNewInvoice({ invoice_number: `INV-${Math.floor(Math.random() * 10000)}`, customer: '', project: '', amount_due: 0, due_date: '', notes: '' });
-      toast.success('Invoice generated successfully');
-    } catch (e: any) {
-      toast.error('Failed to generate invoice: ' + e.message);
     }
   };
 
   const handleUpdateInvoiceStatus = async (id: number, status: string) => {
-    try {
-      const updated = await apiFetch(`/invoices/${id}/`, {
-        method: 'PATCH',
-        body: JSON.stringify({ status })
-      });
-      setInvoices(invoices.map(inv => inv.id === id ? updated : inv));
-      toast.success(`Invoice updated to ${status}`);
-    } catch (e: any) {
-      toast.error('Failed to update: ' + e.message);
-    }
+    await updateInvoiceStatus(id, status);
   };
 
   const filteredCustomers = customers.filter(c => 

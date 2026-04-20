@@ -1,8 +1,6 @@
-"""
-Django settings for Seabridge Boats Manufacturing project.
-"""
-
+import os
 from pathlib import Path
+from decimal import Decimal
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -19,11 +17,10 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    # Third-party
     'rest_framework',
     'rest_framework.authtoken',
     'corsheaders',
-    # Local apps
+    'django_filters',
     'accounts',
     'inventory',
     'production',
@@ -88,10 +85,8 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# Custom user model
 AUTH_USER_MODEL = 'accounts.CustomUser'
 
-# DRF settings
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.TokenAuthentication',
@@ -100,10 +95,25 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
+    'DEFAULT_FILTER_BACKENDS': [
+        'django_filters.rest_framework.DjangoFilterBackend',
+    ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 50,
 }
 
-# CORS settings - allow frontend dev server
-CORS_ALLOW_ALL_ORIGINS = True  # For development only
+CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
+
+# --- Business Policy Settings ---
+
+# DTR: auto clock-out at cutoff time. Owner must enable after reviewing policy.
+AUTO_TIMEOUT_ENABLED = os.environ.get('AUTO_TIMEOUT_ENABLED', 'False') == 'True'
+AUTO_TIMEOUT_TIME = os.environ.get('AUTO_TIMEOUT_TIME', '23:59')
+
+# Deadline penalty: 'none', 'warning_only', 'payroll_deduction'
+DEADLINE_MISS_PENALTY_TYPE = os.environ.get('DEADLINE_MISS_PENALTY_TYPE', 'warning_only')
+DEADLINE_MISS_FIXED_PENALTY = Decimal(os.environ.get('DEADLINE_MISS_FIXED_PENALTY', '0'))
+
+# Email notifications for low stock (off by default)
+EMAIL_NOTIFICATIONS_ENABLED = os.environ.get('EMAIL_NOTIFICATIONS_ENABLED', 'False') == 'True'
