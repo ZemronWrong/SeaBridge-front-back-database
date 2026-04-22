@@ -72,6 +72,9 @@ export function SalesModule() {
   });
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [invoiceSearch, setInvoiceSearch] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
 
   const handleCreateCustomer = async () => {
     if (!newCustomer.name) {
@@ -194,6 +197,34 @@ export function SalesModule() {
       <TabsContent value="invoices" className="space-y-6">
         <div className="flex justify-between items-center">
           <h2 className="text-xl font-semibold flex items-center gap-2"><CreditCard className="w-5 h-5"/> Billing Records</h2>
+          <div className="flex flex-wrap flex-1 mx-4 bg-white border border-gray-200 rounded-md p-1 px-3 shadow-sm focus-within:ring-2 focus-within:ring-blue-500 transition-all items-center gap-2">
+            <Search className="w-4 h-4 text-gray-400 shrink-0" />
+            <input 
+              type="text" 
+              placeholder="Search invoice # or client..."
+              className="flex-1 bg-transparent border-none focus:outline-none text-sm w-full min-w-[120px]"
+              value={invoiceSearch}
+              onChange={(e) => setInvoiceSearch(e.target.value)}
+            />
+            <div className="flex items-center gap-2 border-l border-gray-200 pl-3">
+              <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">After:</span>
+              <input 
+                type="date" 
+                className="bg-transparent border-none focus:outline-none text-sm text-gray-700 cursor-pointer w-32"
+                value={fromDate}
+                onChange={e => setFromDate(e.target.value)}
+              />
+            </div>
+            <div className="flex items-center gap-2 border-l border-gray-200 pl-3">
+              <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Before:</span>
+              <input 
+                type="date" 
+                className="bg-transparent border-none focus:outline-none text-sm text-gray-700 cursor-pointer w-32"
+                value={toDate}
+                onChange={e => setToDate(e.target.value)}
+              />
+            </div>
+          </div>
           <Dialog open={isInvoiceDialogOpen} onOpenChange={setIsInvoiceDialogOpen}>
             <DialogTrigger asChild>
               <Button><FileText className="w-4 h-4 mr-2" /> Generate Invoice</Button>
@@ -260,7 +291,11 @@ export function SalesModule() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {invoices.map(inv => (
+                {invoices
+                  .filter(inv => !invoiceSearch || inv.invoice_number.toLowerCase().includes(invoiceSearch.toLowerCase()) || inv.customer_name.toLowerCase().includes(invoiceSearch.toLowerCase()))
+                  .filter(inv => !fromDate || inv.issued_date >= fromDate)
+                  .filter(inv => !toDate || inv.issued_date <= toDate)
+                  .map(inv => (
                   <TableRow key={inv.id}>
                     <TableCell className="font-medium text-blue-600">{inv.invoice_number}</TableCell>
                     <TableCell>{new Date(inv.issued_date).toLocaleDateString()}</TableCell>
@@ -270,7 +305,7 @@ export function SalesModule() {
                         <span className="flex items-center gap-1 text-sm text-gray-600"><Ship className="w-3 h-3"/> {inv.project_code}</span>
                       ) : '-'}
                     </TableCell>
-                    <TableCell className="font-bold">₱{Number(inv.amount_due).toLocaleString()}</TableCell>
+                    <TableCell className="font-bold">₱{Number(inv.amount_due).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
                     <TableCell>{inv.due_date}</TableCell>
                     <TableCell>{getStatusBadge(inv.status)}</TableCell>
                     <TableCell>

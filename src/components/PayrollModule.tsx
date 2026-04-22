@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Badge } from './ui/badge';
-import { Plus, DollarSign, Calendar, FileText, Download } from 'lucide-react';
+import { Plus, DollarSign, Calendar, FileText, Download, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../api';
@@ -49,6 +49,9 @@ export function PayrollModule({}: PayrollModuleProps) {
   const { employees, records: payrollRecords, createPayroll, updateStatus } = usePayroll();
   const [isPayrollDialogOpen, setIsPayrollDialogOpen] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState('all');
+  const [employeeSearch, setEmployeeSearch] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
 
   const [newPayroll, setNewPayroll] = useState({
     employeeId: '',
@@ -99,9 +102,14 @@ export function PayrollModule({}: PayrollModuleProps) {
   
   const roleFilteredRecords = Array.isArray(payrollRecords) ? payrollRecords : [];
 
-  const filteredRecords = selectedPeriod === 'all' 
-    ? roleFilteredRecords 
-    : roleFilteredRecords.filter((r: PayrollRecord) => r.period === selectedPeriod);
+  const filteredRecords = roleFilteredRecords.filter((r: PayrollRecord) => {
+    const matchPeriod = selectedPeriod === 'all' || r.period === selectedPeriod;
+    const matchSearch = !employeeSearch || r.employee_name.toLowerCase().includes(employeeSearch.toLowerCase()) || String(r.payroll_id).toLowerCase().includes(employeeSearch.toLowerCase());
+    const rowDate = r.created_date ? r.created_date.substring(0, 10) : '';
+    const matchFrom = !fromDate || rowDate >= fromDate;
+    const matchTo = !toDate || rowDate <= toDate;
+    return matchPeriod && matchSearch && matchFrom && matchTo;
+  });
 
   const periods = ['all', ...Array.from(new Set(roleFilteredRecords.map((r: PayrollRecord) => r.period)))];
   
@@ -191,17 +199,17 @@ export function PayrollModule({}: PayrollModuleProps) {
           <h2>Earnings</h2>
           <table>
             <tr><th>Description</th><th>Amount (PHP)</th></tr>
-            <tr><td>Basic Pay (${record.days_worked} days x ₱${Number(record.daily_rate).toLocaleString()})</td><td>₱${gross.toLocaleString()}</td></tr>
-            <tr><td>Allowances (5%)</td><td>₱${allowances.toLocaleString()}</td></tr>
+            <tr><td>Basic Pay (${record.days_worked} days x ₱${Number(record.daily_rate).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})})</td><td>₱${gross.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td></tr>
+            <tr><td>Allowances (5%)</td><td>₱${allowances.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td></tr>
           </table>
           <h2>Deductions</h2>
           <table>
             <tr><th>Description</th><th>Amount (PHP)</th></tr>
-            <tr><td>Statutory & Other Deductions</td><td>₱${totalDeductions.toLocaleString()}</td></tr>
+            <tr><td>Statutory & Other Deductions</td><td>₱${totalDeductions.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td></tr>
           </table>
           <h2>Net Pay</h2>
           <table>
-            <tr><th>Net Pay</th><td>₱${netPay.toLocaleString()}</td></tr>
+            <tr><th>Net Pay</th><td>₱${netPay.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td></tr>
           </table>
           <p style="margin-top:24px;font-size:12px;color:#6b7280">
             Note: This payslip can be exported as PDF using the browser's "Print" &gt; "Save as PDF" option.
@@ -276,19 +284,19 @@ export function PayrollModule({}: PayrollModuleProps) {
                   <div className="p-4 bg-blue-50 rounded-lg space-y-2">
                     <div className="flex justify-between">
                       <span>Daily Rate:</span>
-                      <span>₱{Number(employees.find(e => e.employee_id === newPayroll.employeeId)?.daily_rate || 0).toLocaleString()}</span>
+                      <span>₱{Number(employees.find(e => e.employee_id === newPayroll.employeeId)?.daily_rate || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Gross Pay:</span>
-                      <span>₱{(Number(employees.find(e => e.employee_id === newPayroll.employeeId)?.daily_rate || 0) * newPayroll.days_worked).toLocaleString()}</span>
+                      <span>₱{(Number(employees.find(e => e.employee_id === newPayroll.employeeId)?.daily_rate || 0) * newPayroll.days_worked).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Deductions (10%):</span>
-                      <span>₱{((Number(employees.find(e => e.employee_id === newPayroll.employeeId)?.daily_rate || 0) * newPayroll.days_worked) * 0.10).toLocaleString()}</span>
+                      <span>₱{((Number(employees.find(e => e.employee_id === newPayroll.employeeId)?.daily_rate || 0) * newPayroll.days_worked) * 0.10).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                     </div>
                     <div className="flex justify-between pt-2 border-t">
                       <span>Net Pay:</span>
-                      <span>₱{((Number(employees.find(e => e.employee_id === newPayroll.employeeId)?.daily_rate || 0) * newPayroll.days_worked) * 0.90).toLocaleString()}</span>
+                      <span>₱{((Number(employees.find(e => e.employee_id === newPayroll.employeeId)?.daily_rate || 0) * newPayroll.days_worked) * 0.90).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                     </div>
                   </div>
                 )}
@@ -320,7 +328,7 @@ export function PayrollModule({}: PayrollModuleProps) {
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Daily Rate</p>
-                    <p>₱{Number(currentEmployee.daily_rate).toLocaleString()}</p>
+                    <p>₱{Number(currentEmployee.daily_rate).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Type</p>
@@ -350,7 +358,7 @@ export function PayrollModule({}: PayrollModuleProps) {
             <CardContent className="p-6">
               <div>
                 <p className="text-sm text-gray-600">Total Gross Pay</p>
-                <p className="text-2xl mt-2">₱{totalGrossPay.toLocaleString()}</p>
+                <p className="text-2xl mt-2">₱{totalGrossPay.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
               </div>
             </CardContent>
           </Card>
@@ -358,7 +366,7 @@ export function PayrollModule({}: PayrollModuleProps) {
             <CardContent className="p-6">
               <div>
                 <p className="text-sm text-gray-600">Total Net Pay</p>
-                <p className="text-2xl mt-2">₱{totalNetPay.toLocaleString()}</p>
+                <p className="text-2xl mt-2">₱{totalNetPay.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
               </div>
             </CardContent>
           </Card>
@@ -375,22 +383,64 @@ export function PayrollModule({}: PayrollModuleProps) {
 
       {/* Filters */}
       <Card>
-        <CardContent className="p-6">
-          <div className="flex gap-4">
-            <div className="flex-1">
-              <Label>Filter by Period</Label>
-              <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {periods.map(period => (
-                    <SelectItem key={period} value={period}>
-                      {period === 'all' ? 'All Periods' : period}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <DollarSign className="w-5 h-5 text-blue-600" />
+            Payroll Filters
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col md:flex-row gap-4 items-center w-full">
+            <div className="flex flex-wrap flex-1 w-full bg-white border border-gray-200 rounded-md p-1 px-3 shadow-sm focus-within:ring-2 focus-within:ring-blue-500 transition-all items-center gap-2">
+              {!isEmployeeView && (
+                <>
+                  <Search className="w-4 h-4 text-gray-400 shrink-0" />
+                  <input 
+                    type="text" 
+                    placeholder="Search name or ID..."
+                    className="flex-1 bg-transparent border-none focus:outline-none text-sm min-w-[120px]"
+                    value={employeeSearch}
+                    onChange={(e) => setEmployeeSearch(e.target.value)}
+                  />
+                  <div className="border-l border-gray-200 h-6 mx-2 hidden md:block"></div>
+                </>
+              )}
+              
+              <div className="flex items-center gap-2 pl-2 border-l border-gray-200 md:border-none">
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider hidden md:inline">Period:</span>
+                <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+                  <SelectTrigger className="h-8 border-none bg-transparent shadow-none w-[130px] focus:ring-0 px-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {periods.map(period => (
+                      <SelectItem key={period} value={period}>
+                        {period === 'all' ? 'All Periods' : period}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="flex items-center gap-2 border-l border-gray-200 pl-3">
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider hidden lg:inline">After:</span>
+                <input 
+                  type="date" 
+                  className="bg-transparent border-none focus:outline-none text-sm text-gray-700 cursor-pointer w-[120px]"
+                  value={fromDate}
+                  onChange={e => setFromDate(e.target.value)}
+                />
+              </div>
+              
+              <div className="flex items-center gap-2 border-l border-gray-200 pl-3">
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider hidden lg:inline">Before:</span>
+                <input 
+                  type="date" 
+                  className="bg-transparent border-none focus:outline-none text-sm text-gray-700 cursor-pointer w-[120px]"
+                  value={toDate}
+                  onChange={e => setToDate(e.target.value)}
+                />
+              </div>
             </div>
           </div>
         </CardContent>
@@ -419,7 +469,7 @@ export function PayrollModule({}: PayrollModuleProps) {
                     <TableCell>{employee.employee_id}</TableCell>
                     <TableCell>{employee.name}</TableCell>
                     <TableCell>{employee.position}</TableCell>
-                    <TableCell>₱{Number(employee.daily_rate).toLocaleString()}</TableCell>
+                    <TableCell>₱{Number(employee.daily_rate).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
                     <TableCell>
                       <Badge variant={employee.employment_type === 'Regular' ? 'default' : 'secondary'}>
                         {employee.employment_type}
@@ -477,9 +527,9 @@ export function PayrollModule({}: PayrollModuleProps) {
                   {!isEmployeeView && <TableCell className="text-sm">{record.position}</TableCell>}
                   <TableCell>{record.period}</TableCell>
                   <TableCell>{record.days_worked}</TableCell>
-                  <TableCell>₱{Number(record.gross_pay).toLocaleString()}</TableCell>
-                  <TableCell>₱{Number(record.deductions).toLocaleString()}</TableCell>
-                  <TableCell>₱{Number(record.net_pay).toLocaleString()}</TableCell>
+                  <TableCell>₱{Number(record.gross_pay).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
+                  <TableCell>₱{Number(record.deductions).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
+                  <TableCell>₱{Number(record.net_pay).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
                   <TableCell>
                     <Badge 
                       variant={
@@ -555,21 +605,21 @@ export function PayrollModule({}: PayrollModuleProps) {
                 </div>
                 <div className="flex justify-between">
                   <span>Daily Rate</span>
-                  <span>₱{Number(selectedPayslip.daily_rate || 0).toLocaleString()}</span>
+                  <span>₱{Number(selectedPayslip.daily_rate || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                 </div>
               </div>
               <div className="border rounded-lg p-3 text-sm space-y-1">
                 <div className="flex justify-between">
                   <span>Gross Pay</span>
-                  <span>₱{Number(selectedPayslip.gross_pay || 0).toLocaleString()}</span>
+                  <span>₱{Number(selectedPayslip.gross_pay || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                 </div>
                 <div className="flex justify-between text-red-600">
                   <span>Deductions (10%)</span>
-                  <span>₱{Number(selectedPayslip.deductions || 0).toLocaleString()}</span>
+                  <span>₱{Number(selectedPayslip.deductions || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                 </div>
                 <div className="flex justify-between font-semibold border-t pt-2 mt-1">
                   <span>Net Pay</span>
-                  <span>₱{Number(selectedPayslip.net_pay || 0).toLocaleString()}</span>
+                  <span>₱{Number(selectedPayslip.net_pay || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                 </div>
               </div>
               <div className="flex justify-end gap-2">

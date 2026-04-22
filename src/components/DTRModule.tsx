@@ -5,7 +5,7 @@ import { Badge } from './ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Input } from './ui/input';
-import { Calendar, Clock, Download } from 'lucide-react';
+import { Calendar, Clock, Download, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import { useDTR } from '../hooks/useDTR';
@@ -32,7 +32,9 @@ export function DTRModule() {
   const { user } = useAuth();
   const { records, loading, handleClockIn, handleClockOut, handleApproveAdjustment } = useDTR();
   const [periodFilter, setPeriodFilter] = useState<'today' | 'week' | 'month' | 'all'>('today');
-  const [dateFilter, setDateFilter] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
 
   const today = new Date().toLocaleDateString('en-CA');
   const isEmployee = user?.role === 'worker' || user?.role === 'foreman';
@@ -40,9 +42,8 @@ export function DTRModule() {
 
   // Filter records based on selected period logic (frontend)
   const filteredByPeriod = records.filter((r) => {
-    if (dateFilter) {
-      return r.date === dateFilter;
-    }
+    if (fromDate && r.date < fromDate) return false;
+    if (toDate && r.date > toDate) return false;
     if (periodFilter === 'today') return r.date === today;
     
     if (periodFilter === 'week') {
@@ -139,32 +140,57 @@ export function DTRModule() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <p className="text-xs text-gray-500 mb-1">Period</p>
-              <Select value={periodFilter} onValueChange={(v: any) => setPeriodFilter(v)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="today">Today</SelectItem>
-                  <SelectItem value="week">This Week</SelectItem>
-                  <SelectItem value="month">This Month</SelectItem>
-                  <SelectItem value="all">All Records</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500 mb-1">Specific Date</p>
-              <Input
-                type="date"
-                value={dateFilter}
-                onChange={(e) => setDateFilter(e.target.value)}
+          <div className="flex flex-col md:flex-row gap-4 items-center w-full">
+            <div className="flex flex-wrap flex-1 w-full bg-white border border-gray-200 rounded-md p-1 px-3 shadow-sm focus-within:ring-2 focus-within:ring-blue-500 transition-all items-center gap-2">
+              <Search className="w-4 h-4 text-gray-400 shrink-0" />
+              <input 
+                type="text" 
+                placeholder="Search name or ID..."
+                className="flex-1 bg-transparent border-none focus:outline-none text-sm min-w-[120px]"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
               />
+              <div className="border-l border-gray-200 h-6 mx-2 hidden md:block"></div>
+              
+              <div className="flex items-center gap-2 pl-2 border-l border-gray-200 md:border-none">
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider hidden md:inline">Preset:</span>
+                <Select value={periodFilter} onValueChange={(v: any) => setPeriodFilter(v)}>
+                  <SelectTrigger className="h-8 border-none bg-transparent shadow-none w-[110px] focus:ring-0 px-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="today">Today</SelectItem>
+                    <SelectItem value="week">This Week</SelectItem>
+                    <SelectItem value="month">This Month</SelectItem>
+                    <SelectItem value="all">All Records</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="flex items-center gap-2 border-l border-gray-200 pl-3">
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider hidden lg:inline">After:</span>
+                <input 
+                  type="date" 
+                  className="bg-transparent border-none focus:outline-none text-sm text-gray-700 cursor-pointer w-[120px]"
+                  value={fromDate}
+                  onChange={e => setFromDate(e.target.value)}
+                />
+              </div>
+              
+              <div className="flex items-center gap-2 border-l border-gray-200 pl-3">
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider hidden lg:inline">Before:</span>
+                <input 
+                  type="date" 
+                  className="bg-transparent border-none focus:outline-none text-sm text-gray-700 cursor-pointer w-[120px]"
+                  value={toDate}
+                  onChange={e => setToDate(e.target.value)}
+                />
+              </div>
             </div>
-            <div className="flex items-end">
-              <p className="text-xs text-gray-500">
-                Exported reports can be opened in Excel and saved as PDF for submission.
+            
+            <div className="flex items-end justify-center">
+              <p className="text-xs text-gray-500 whitespace-nowrap">
+                Exported reports match current filters.
               </p>
             </div>
           </div>
@@ -198,7 +224,9 @@ export function DTRModule() {
                   </TableCell>
                 </TableRow>
               ) : filteredByPeriod.length > 0 ? (
-                filteredByPeriod.map((rec) => (
+                filteredByPeriod
+                  .filter(r => !searchTerm || r.employee_name.toLowerCase().includes(searchTerm.toLowerCase()) || r.dtr_id.toLowerCase().includes(searchTerm.toLowerCase()))
+                  .map((rec) => (
                   <TableRow key={rec.id}>
                     <TableCell>{rec.date}</TableCell>
                     {!isEmployee && <TableCell>{rec.employee_name}</TableCell>}

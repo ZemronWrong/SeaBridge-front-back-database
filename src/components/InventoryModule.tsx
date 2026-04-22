@@ -92,6 +92,12 @@ export function InventoryModule() {
   const userRole = user?.role || 'worker';
   
   const [searchTerm, setSearchTerm] = useState('');
+  const [reqSearch, setReqSearch] = useState('');
+  const [poSearch, setPoSearch] = useState('');
+  const [reqFromDate, setReqFromDate] = useState('');
+  const [reqToDate, setReqToDate] = useState('');
+  const [poFromDate, setPoFromDate] = useState('');
+  const [poToDate, setPoToDate] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
@@ -142,6 +148,22 @@ export function InventoryModule() {
     supplier: '',
     expected_delivery: '',
     items: [{ material: '', quantity: 1, unit_price: 0 }] as any[]
+  });
+
+  const filteredRequests = requests.filter(req => {
+    const reqDate = req.created_at ? req.created_at.substring(0, 10) : '';
+    const matchFrom = !reqFromDate || reqDate >= reqFromDate;
+    const matchTo = !reqToDate || reqDate <= reqToDate;
+    const matchSearch = !reqSearch || req.requester_name.toLowerCase().includes(reqSearch.toLowerCase()) || req.material_name.toLowerCase().includes(reqSearch.toLowerCase());
+    return matchFrom && matchTo && matchSearch;
+  });
+
+  const filteredPOs = purchaseOrders.filter(po => {
+    const poDate = po.created_at ? po.created_at.substring(0, 10) : '';
+    const matchFrom = !poFromDate || poDate >= poFromDate;
+    const matchTo = !poToDate || poDate <= poToDate;
+    const matchSearch = !poSearch || po.po_number.toLowerCase().includes(poSearch.toLowerCase()) || po.supplier_name.toLowerCase().includes(poSearch.toLowerCase());
+    return matchFrom && matchTo && matchSearch;
   });
 
   const filteredMaterials = materials.filter((material) => {
@@ -404,7 +426,7 @@ export function InventoryModule() {
             <CardContent className="p-6">
               <div>
                 <p className="text-sm text-gray-600">Total Inventory Value</p>
-                <p className="text-2xl mt-2">₱{totalValue.toLocaleString()}</p>
+                <p className="text-2xl mt-2">₱{totalValue.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
               </div>
             </CardContent>
           </Card>
@@ -472,9 +494,9 @@ export function InventoryModule() {
                     <TableCell>{material.quantity || 0} {material.unit}</TableCell>
                     <TableCell>{material.min_stock || 0} {material.unit}</TableCell>
                     <TableCell>{getStockStatus(material)}</TableCell>
-                    <TableCell>₱{Number(material.unit_price || 0).toLocaleString()}</TableCell>
+                    <TableCell>₱{Number(material.unit_price || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
                     <TableCell className="font-medium text-blue-600">{material.supplier_name || 'No Supplier'}</TableCell>
-                    <TableCell>₱{((material.quantity || 0) * Number(material.unit_price || 0)).toLocaleString()}</TableCell>
+                    <TableCell>₱{((material.quantity || 0) * Number(material.unit_price || 0)).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
                     <TableCell className="text-sm">{material.last_updated ? material.last_updated.substring(0, 10) : '-'}</TableCell>
                     {canUpdateStock && (
                       <TableCell className="flex gap-2">
@@ -514,8 +536,38 @@ export function InventoryModule() {
       </TabsContent>
 
       <TabsContent value="requests" className="space-y-6">
-        <div className="flex justify-between items-center">
-          <h2 className="text-xl font-semibold">Material Requests</h2>
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div className="flex items-center gap-4 flex-1 w-full max-w-2xl">
+            <h2 className="text-xl font-semibold min-w-fit hidden md:block">Material Requests</h2>
+            <div className="flex flex-wrap flex-1 bg-white border border-gray-200 rounded-md p-1 px-3 shadow-sm focus-within:ring-2 focus-within:ring-blue-500 transition-all items-center gap-2">
+              <Search className="w-4 h-4 text-gray-400 shrink-0" />
+              <input 
+                type="text" 
+                placeholder="Search..."
+                className="flex-1 bg-transparent border-none focus:outline-none text-sm min-w-[120px]"
+                value={reqSearch}
+                onChange={(e) => setReqSearch(e.target.value)}
+              />
+              <div className="flex items-center gap-2 border-l border-gray-200 pl-3">
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider hidden lg:inline">After:</span>
+                <input 
+                  type="date" 
+                  className="bg-transparent border-none focus:outline-none text-sm text-gray-700 cursor-pointer w-[120px]"
+                  value={reqFromDate}
+                  onChange={e => setReqFromDate(e.target.value)}
+                />
+              </div>
+              <div className="flex items-center gap-2 border-l border-gray-200 pl-3">
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider hidden lg:inline">Before:</span>
+                <input 
+                  type="date" 
+                  className="bg-transparent border-none focus:outline-none text-sm text-gray-700 cursor-pointer w-[120px]"
+                  value={reqToDate}
+                  onChange={e => setReqToDate(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
           {canCreateRequest && (
             <Dialog open={isRequestDialogOpen} onOpenChange={setIsRequestDialogOpen}>
               <DialogTrigger asChild>
@@ -581,9 +633,9 @@ export function InventoryModule() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {requests.length === 0 ? (
+                {filteredRequests.length === 0 ? (
                   <TableRow><TableCell colSpan={8} className="text-center py-4">No material requests found.</TableCell></TableRow>
-                ) : requests.map(req => (
+                ) : filteredRequests.map(req => (
                   <TableRow key={req.id}>
                     <TableCell>{new Date(req.created_at).toLocaleDateString()}</TableCell>
                     <TableCell>{req.requester_name}</TableCell>
@@ -616,8 +668,38 @@ export function InventoryModule() {
 
       {canAddMaterial && (
         <TabsContent value="purchase-orders" className="space-y-6">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-semibold">Purchase Orders</h2>
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+            <div className="flex items-center gap-4 flex-1 w-full max-w-2xl">
+              <h2 className="text-xl font-semibold min-w-fit hidden md:block">Purchase Orders</h2>
+              <div className="flex flex-wrap flex-1 bg-white border border-gray-200 rounded-md p-1 px-3 shadow-sm focus-within:ring-2 focus-within:ring-blue-500 transition-all items-center gap-2">
+                <Search className="w-4 h-4 text-gray-400 shrink-0" />
+                <input 
+                  type="text" 
+                  placeholder="Search POs..."
+                  className="flex-1 bg-transparent border-none focus:outline-none text-sm min-w-[120px]"
+                  value={poSearch}
+                  onChange={(e) => setPoSearch(e.target.value)}
+                />
+                <div className="flex items-center gap-2 border-l border-gray-200 pl-3">
+                  <span className="text-xs font-bold text-gray-400 uppercase tracking-wider hidden lg:inline">After:</span>
+                  <input 
+                    type="date" 
+                    className="bg-transparent border-none focus:outline-none text-sm text-gray-700 cursor-pointer w-[120px]"
+                    value={poFromDate}
+                    onChange={e => setPoFromDate(e.target.value)}
+                  />
+                </div>
+                <div className="flex items-center gap-2 border-l border-gray-200 pl-3">
+                  <span className="text-xs font-bold text-gray-400 uppercase tracking-wider hidden lg:inline">Before:</span>
+                  <input 
+                    type="date" 
+                    className="bg-transparent border-none focus:outline-none text-sm text-gray-700 cursor-pointer w-[120px]"
+                    value={poToDate}
+                    onChange={e => setPoToDate(e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
             <Dialog open={isPODialogOpen} onOpenChange={setIsPODialogOpen}>
               <DialogTrigger asChild>
                 <Button><Plus className="w-4 h-4 mr-2" /> Build PO</Button>
@@ -727,16 +809,16 @@ export function InventoryModule() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {purchaseOrders.length === 0 ? (
+                  {filteredPOs.length === 0 ? (
                     <TableRow><TableCell colSpan={8} className="text-center py-4">No purchase orders found.</TableCell></TableRow>
-                  ) : purchaseOrders.map(po => (
+                  ) : filteredPOs.map(po => (
                     <TableRow key={po.id}>
                       <TableCell className="font-medium text-blue-600">{po.po_number}</TableCell>
                       <TableCell>{new Date(po.created_at).toLocaleDateString()}</TableCell>
                       <TableCell>{po.supplier_name}</TableCell>
                       <TableCell>{po.items?.length || 0} type(s)</TableCell>
                       <TableCell>{po.expected_delivery || '-'}</TableCell>
-                      <TableCell>₱{Number(po.total_cost || 0).toLocaleString()}</TableCell>
+                      <TableCell>₱{Number(po.total_cost || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</TableCell>
                       <TableCell>{getPOStatusBadge(po.status)}</TableCell>
                       <TableCell>
                         <Select value={po.status} onValueChange={(v: string) => handleUpdatePOStatus(po.id, v)}>

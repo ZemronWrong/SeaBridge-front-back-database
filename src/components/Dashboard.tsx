@@ -46,7 +46,7 @@ export function Dashboard() {
     },
     { 
       title: 'Monthly Payroll', 
-      value: `₱${metrics.monthlyPayroll.toLocaleString()}`, 
+      value: `₱${metrics.monthlyPayroll.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, 
       icon: DollarSign, 
       color: 'text-emerald-600',
       bgColor: 'bg-emerald-50'

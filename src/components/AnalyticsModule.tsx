@@ -39,8 +39,8 @@ export function AnalyticsModule() {
     );
   }
 
-  const totalExpenditure = data?.expenditures.reduce((s, r) => s + r.total, 0) || 0;
-  const totalInventoryValue = data?.inventory.reduce((s, r) => s + r.value, 0) || 0;
+  const totalExpenditure = data?.expenditures.reduce((s, r) => s + Number(r.total), 0) || 0;
+  const totalInventoryValue = data?.inventory.reduce((s, r) => s + Number(r.value), 0) || 0;
   const overdueProjects = data?.production.filter(p => p.overdue).length || 0;
   const paidInvoices = data?.invoices.find(i => i.status === 'Paid')?.count || 0;
 
@@ -59,14 +59,14 @@ export function AnalyticsModule() {
         <Card className="border-l-4 border-l-blue-500">
           <CardContent className="p-5">
             <p className="text-xs text-gray-500 uppercase tracking-wide">Total Procurement</p>
-            <p className="text-2xl font-bold mt-1">₱{totalExpenditure.toLocaleString()}</p>
+            <p className="text-2xl font-bold mt-1">₱{totalExpenditure.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
             <p className="text-xs text-gray-400 mt-1">From received POs</p>
           </CardContent>
         </Card>
         <Card className="border-l-4 border-l-emerald-500">
           <CardContent className="p-5">
             <p className="text-xs text-gray-500 uppercase tracking-wide">Inventory Value</p>
-            <p className="text-2xl font-bold mt-1">₱{totalInventoryValue.toLocaleString()}</p>
+            <p className="text-2xl font-bold mt-1">₱{totalInventoryValue.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
             <p className="text-xs text-gray-400 mt-1">Capital tied up in stock</p>
           </CardContent>
         </Card>
@@ -115,8 +115,8 @@ export function AnalyticsModule() {
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-                <YAxis tickFormatter={v => `₱${(v/1000).toFixed(0)}k`} tick={{ fontSize: 12 }} />
-                <Tooltip formatter={(v: number) => [`₱${v.toLocaleString()}`, 'Total Spend']} />
+                <YAxis tickFormatter={v => `₱${v.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`} tick={{ fontSize: 12 }} />
+                <Tooltip formatter={(v: number) => [`₱${v.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, 'Total Spend']} />
                 <Area type="monotone" dataKey="total" stroke="#1e40af" strokeWidth={2} fill="url(#expendGrad)" />
               </AreaChart>
             </ResponsiveContainer>
@@ -192,7 +192,7 @@ export function AnalyticsModule() {
                       <Cell key={`cell-${idx}`} fill={PIE_COLORS[idx % PIE_COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(v: number, name: string) => [`₱${v.toLocaleString()}`, name]} />
+                  <Tooltip formatter={(v: number, name: string) => [`₱${v.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, name]} />
                   <Legend />
                 </PieChart>
               </ResponsiveContainer>
